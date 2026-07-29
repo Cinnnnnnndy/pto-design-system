@@ -53,4 +53,16 @@ assert.equal(ppTpLayout.positions.get(0).y-ppLayout.positions.get(0).y,ppTpLayou
 assert.throws(()=>api.partitionModel(model,{...api.DEFAULT_TOPOLOGY,worldSize:127}),/worldSize/);
 assert.throws(()=>api.partitionModel({...model,stageRanges:[[0,11],[12,22],[23,34],[34,45]]},api.DEFAULT_TOPOLOGY),/exactly once/);
 
-console.log('model-parallel-rank-deck planner: 38 assertions passed');
+// 载荷原子（参照系 §02/§03/§15）：被切算子按 1/count 片渲染，片位正确；复制与通信不切
+assert.equal(api.shardPlacement(1,0,{kind:'replicated',replicaAxis:'edp'},'linear'),null,'Replicated operators keep full width');
+assert.equal(api.shardPlacement(1,0,{kind:'sharded',axis:'tp',index:0,count:2},'comm'),null,'Communication operators are actions, never sliced');
+const tpSlice0=api.shardPlacement(1,.5,{kind:'sharded',axis:'tp',index:0,count:2},'linear');
+assert.deepEqual(tpSlice0,{scaleX:.5,localX:.25,fullScaleX:1,fullLocalX:.5},'TP0 takes the left half at its slice offset');
+const tpSlice1=api.shardPlacement(1,.5,{kind:'sharded',axis:'tp',index:1,count:2},'linear');
+assert.deepEqual(tpSlice1,{scaleX:.5,localX:.75,fullScaleX:1,fullLocalX:.5},'TP1 takes the right half — slices tile the parent exactly');
+const epSlice=api.shardPlacement(2,0,{kind:'sharded',axis:'ep',index:2,count:8},'moe');
+assert.equal(epSlice.scaleX,.25);
+assert.ok(Math.abs(epSlice.localX-(-.375))<1e-9,'EP bucket 2/8 sits at its bucket offset');
+assert.equal(api.shardPlacement(.1,0,{kind:'sharded',axis:'tp',index:0,count:4},'linear').scaleX,.09,'Slice width keeps the legibility floor');
+
+console.log('model-parallel-rank-deck planner: 45 assertions passed');

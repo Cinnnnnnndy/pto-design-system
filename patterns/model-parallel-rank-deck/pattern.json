@@ -2,7 +2,7 @@
   "id": "model-parallel-rank-deck",
   "name": "Model Parallel Rank Three.js Deck",
   "type": "hybrid",
-  "description": "Partitions the canonical openPangu architecture by PP, TP, EP, and EDP and compiles every original Layer Node, Cluster, and Edge into GPU batches inside 128 transparent Three.js Rank volumes.",
+  "description": "Partitions the canonical openPangu architecture by PP, TP, EP, and EDP and compiles every original Layer Node, Cluster, and Edge into GPU batches inside 128 transparent Three.js Rank volumes. The payload atom is the shard: TP/EP-sharded operators render at 1/count geometry at their slice offset (with a faint full-extent footprint), so each Rank shows the intersection of its per-axis intervals — layer segment × tensor shard × expert bucket × replica — never a miniature whole network.",
   "typography": {
     "bodyMinimumPx": 14,
     "uiMinimumPx": 12,
@@ -65,7 +65,8 @@
     "Do not describe the 128-rank demo mapping as the official openPangu training topology.",
     "Do not conflate EP groups with MoGE route groups or EDP with a generic display REP axis.",
     "Do not create one Three.js Group or one DOM subtree per Rank.",
-    "Do not create one canvas texture per duplicated operator label."
+    "Do not create one canvas texture per duplicated operator label.",
+    "Do not render TP/EP-sharded operators at full source width — the payload atom is the shard/bucket intersection (参照系 §02/§03/§15), not a miniature whole network per Rank."
   ],
   "agentReuseRule": "Load model-graphviz, model-architecture-3d-deck, then model-parallel-rank-deck and a pinned local Three.js module. Call PtoModelParallelRankDeck.render with THREE and model/topology data. ModelSceneSpec must be compiled from PtoModelArchitecture3dDeck.renderLayerScene/renderStaticScene and retain every original node, cluster, edge, label, geometry, and state."
 }

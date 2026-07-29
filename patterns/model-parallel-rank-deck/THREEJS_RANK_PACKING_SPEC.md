@@ -9,7 +9,7 @@ Canonical parallel planner: `./pattern.js`
 
 Render the complete openPangu model payload inside its assigned 128 Rank compute containers while keeping the combined view interactive at an isometric overview. The combined view uses one Three.js WebGL scene. DOM is limited to controls, Inspector, tooltip, accessibility text, and other product chrome.
 
-The model is partitioned by PP, TP, EP, CP, and EDP. A Rank is a transparent compute container, not a replacement for the model. Every physical Layer assigned by the planner remains a complete Layer payload.
+The model is partitioned by PP, TP, EP, CP, and EDP. A Rank is a transparent compute container, not a replacement for the model. Every physical Layer assigned by the planner keeps its complete semantic inventory, but the payload atom is the shard, not the Rank: a TP- or EP-sharded operator occupies 1/count of its source geometry at its slice offset, so a Rank renders the intersection of its per-axis intervals (layer segment × tensor shard × expert bucket × replica id) rather than a miniature whole network. This follows 分布式训练参照系 §02 (ownership boundary), §03 (index quintuple), and §15 (a Rank is an address on a container; the minimal unit of a cut is the slice/bucket).
 
 ## 2. Non-negotiable source-integrity contract
 
@@ -73,6 +73,7 @@ REP0 (`EDP0 · EP0`) is the first display row nearest the default camera. The de
 - Operators: one `InstancedMesh` per geometry/material semantic family, never one Mesh per operator.
 - Edges: one `LineSegments` buffer per edge kind.
 - Expert marks: instanced and created only from Expert ownership data.
+- Shard footprints: one `InstancedMesh` of faint full-extent boxes behind sharded operators (solid Layers only), so "slice < parent operator" is legible in geometry. It never hides content and never changes semantic counts.
 - Text: shared atlas or Inspector DOM; never one canvas texture per duplicated operator.
 
 Each operator instance maps through `SceneIndex` to:
@@ -100,8 +101,8 @@ Selected Rank:
 - Non-selected Rank payloads are visually muted.
 - Selected Rank remains complete and pickable.
 - The first assigned Layer remains solid; every other Layer uses the light-blue ghost treatment at 40% opacity in Rank focus.
-- TP-owned operators retain their original label and append the concrete `TP index/count`; their solid node tone is mixed with the corresponding TP shard color.
-- EP-owned Expert Pool, Dispatch, and Combine nodes append the concrete EP shard. Expert Pool also exposes the exact owned expert range, such as `E96–E127`, and uses the corresponding EP shard tone.
+- TP-owned operators retain their original label and append the concrete `TP index/count`; their solid node tone is mixed with the corresponding TP shard color, and their geometry occupies `1/TP` of the source width at the shard's slice offset with a faint full-extent footprint marking the parent operator shared across the TP group.
+- EP-owned Expert Pool nodes append the concrete EP shard, expose the exact owned expert range, such as `E96–E127`, use the corresponding EP shard tone, and occupy `1/EP` of the source width at the bucket's slice offset. Dispatch and Combine are communication actions and keep their full width.
 - EDP replicas intentionally keep identical Layer structure. The fixed Layer payload header exposes `EDP index/count` so replica identity is visible without inventing a false structural difference.
 - Inspector lists every Layer assigned to the Rank.
 
@@ -155,6 +156,7 @@ Current CSS3D-derived regression baseline:
 - AC-08: Overview operator labels do not create DOM or texture-per-instance cost.
 - AC-09: Default view is a 16° long-lens perspective isometric pose with REP0 as the front row.
 - AC-10: Source-integrity, planner, scene-integrity, and browser smoke tests pass.
+- AC-11: TP/EP-sharded, non-communication operator instances render at `1/count` geometry with the correct slice offset; semantic Node/Cluster/Edge counts remain equal to the canonical renderer output, and the Inspector exposes the Rank's index-quintuple intervals, holding fractions, and ownership boundary.
 
 ## 11. Migration rule
 
