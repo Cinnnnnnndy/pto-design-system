@@ -32,9 +32,14 @@
   const EP_COLORS=['#f97316','#fb7185','#f59e0b','#eab308','#84cc16','#14b8a6','#06b6d4','#8b5cf6'];
   const EDP_COLORS=['#8b5cf6','#ec4899'];
   const GHOST_COLOR='#8ecbff';
-  const TOPOLOGY_COLORS={tp:'#38bdf8',pp:'#38bdf8',ep:'#f97316',edp:'#8b5cf6'};
-  const RANK_SIZE={x:8.6,y:13.8,z:6.2};
-  const RANK_STEP={x:10.5,y:15.8,z:7.6};
+  const TOPOLOGY_COLORS={tp:'#38bdf8',pp:'#38bdf8',ep:'#14b8a6',edp:'#8b5cf6'};
+  // Same 4-color rank palette as communication-traffic-sankey's --rank-0..3, so the
+  // floor traffic gradients share endpoint colors with the sankey links.
+  const RANK_PALETTE=['#52e7c2','#347cff','#f68fc4','#f0cf7a'];
+  // A Layer is a YZ plane whose deck depth runs on X. PP stages use that same
+  // X axis, so their four Layer ranges read as one continuous model in side view.
+  const RANK_SIZE={x:6.2,y:13.8,z:8.6};
+  const RANK_STEP={x:7.6,y:15.8,z:10.5};
   const LAYER_GAP=.43;
   const SOURCE_SCALE=.0108;
   const NODE_DEPTH=.12;
@@ -129,15 +134,11 @@
 
   function layoutPosition(coordinate,topologyInput=DEFAULT_TOPOLOGY,mode='exploded',topologyMode='standard'){
     const topology=normalizeTopology(topologyInput),d=topology.dimensions,multiplier=mode==='exploded'?1.18:1,rep=coordinate.edp*d.ep+coordinate.ep,cTp=(d.tp-1)/2,cPp=(d.pp-1)/2,cEp=(d.ep-1)/2,cEdp=(d.edp-1)/2,cRep=(d.ep*d.edp-1)/2;
-    if(topologyMode==='pp')return{x:(coordinate.pp-cPp)*RANK_STEP.x*2.35*multiplier,y:(cTp-coordinate.tp)*RANK_STEP.y*.78,z:(cRep-rep)*RANK_STEP.z*multiplier};
-    if(topologyMode==='tp')return{x:(coordinate.tp-cTp)*RANK_STEP.x*3.1*multiplier,y:(cPp-coordinate.pp)*RANK_STEP.y,z:(cRep-rep)*RANK_STEP.z*multiplier};
-    if(topologyMode==='ep')return{x:(coordinate.ep-cEp)*RANK_STEP.x*2.2*multiplier+(coordinate.tp-cTp)*RANK_STEP.x,y:(cPp-coordinate.pp)*RANK_STEP.y,z:(cEdp-coordinate.edp)*RANK_STEP.z*2.2};
-    if(topologyMode==='replica')return{x:(coordinate.edp-cEdp)*RANK_STEP.x*3.2*multiplier+(coordinate.tp-cTp)*RANK_STEP.x,y:(cPp-coordinate.pp)*RANK_STEP.y,z:(cEp-coordinate.ep)*RANK_STEP.z*multiplier};
-    return{
-      x:(coordinate.tp-(d.tp-1)/2)*RANK_STEP.x*multiplier,
-      y:((d.pp-1)/2-coordinate.pp)*RANK_STEP.y*multiplier,
-      z:(cRep-rep)*RANK_STEP.z*multiplier
-    };
+    if(topologyMode==='pp')return{x:(coordinate.pp-cPp)*RANK_STEP.x*multiplier,y:(cTp-coordinate.tp)*RANK_STEP.y*.78,z:(cRep-rep)*RANK_STEP.z*multiplier};
+    if(topologyMode==='tp')return{x:(coordinate.pp-cPp)*RANK_STEP.x*multiplier,y:(cTp-coordinate.tp)*RANK_STEP.y*1.42,z:(cRep-rep)*RANK_STEP.z*multiplier};
+    if(topologyMode==='ep')return{x:(coordinate.pp-cPp)*RANK_STEP.x*multiplier,y:(coordinate.ep-cEp)*RANK_STEP.y*1.34+(coordinate.tp-cTp)*RANK_STEP.y*.66,z:(cEdp-coordinate.edp)*RANK_STEP.z*2.2};
+    if(topologyMode==='replica')return{x:(coordinate.pp-cPp)*RANK_STEP.x*multiplier,y:(coordinate.edp-cEdp)*RANK_STEP.y*1.7+(coordinate.tp-cTp)*RANK_STEP.y*.66,z:(cEp-coordinate.ep)*RANK_STEP.z*multiplier};
+    return{x:(coordinate.rank-(topology.worldSize-1)/2)*RANK_STEP.x*multiplier,y:0,z:0};
   }
 
   function buildHierarchicalRankLayout(manifestsInput=[],axesInput=[],mode='exploded',topologyInput=DEFAULT_TOPOLOGY){
@@ -146,13 +147,13 @@
     const first=axes[0],secondaryAxes=new Set(axes.slice(1)),cTp=(d.tp-1)/2,cPp=(d.pp-1)/2,cEp=(d.ep-1)/2,cEdp=(d.edp-1)/2,cRep=(d.ep*d.edp-1)/2,epFirst=axes.includes('ep');
     manifests.forEach(manifest=>{
       const coordinate=manifest.coordinate,depthIndex=epFirst?coordinate.ep*d.edp+coordinate.edp:coordinate.edp*d.ep+coordinate.ep;let position;
-      if(first==='pp')position={x:(coordinate.pp-cPp)*RANK_STEP.x*2.35*multiplier,y:(cTp-coordinate.tp)*RANK_STEP.y*.78,z:(cRep-depthIndex)*RANK_STEP.z*multiplier};
-      else if(first==='tp')position={x:(coordinate.tp-cTp)*RANK_STEP.x*3.1*multiplier,y:(cPp-coordinate.pp)*RANK_STEP.y,z:(cRep-depthIndex)*RANK_STEP.z*multiplier};
-      else if(first==='ep')position={x:(coordinate.ep-cEp)*RANK_STEP.x*2.2*multiplier+(coordinate.tp-cTp)*RANK_STEP.x,y:(cPp-coordinate.pp)*RANK_STEP.y,z:(cEdp-coordinate.edp)*RANK_STEP.z*2.2};
-      else position={x:(coordinate.edp-cEdp)*RANK_STEP.x*3.2*multiplier+(coordinate.tp-cTp)*RANK_STEP.x,y:(cPp-coordinate.pp)*RANK_STEP.y,z:(cEp-coordinate.ep)*RANK_STEP.z*multiplier};
+      if(first==='pp')position={x:(coordinate.pp-cPp)*RANK_STEP.x*multiplier,y:(cTp-coordinate.tp)*RANK_STEP.y*.78,z:(cRep-depthIndex)*RANK_STEP.z*multiplier};
+      else if(first==='tp')position={x:(coordinate.pp-cPp)*RANK_STEP.x*multiplier,y:(cTp-coordinate.tp)*RANK_STEP.y*1.42,z:(cRep-depthIndex)*RANK_STEP.z*multiplier};
+      else if(first==='ep')position={x:(coordinate.pp-cPp)*RANK_STEP.x*multiplier,y:(coordinate.ep-cEp)*RANK_STEP.y*1.34+(coordinate.tp-cTp)*RANK_STEP.y*.66,z:(cEdp-coordinate.edp)*RANK_STEP.z*2.2};
+      else position={x:(coordinate.pp-cPp)*RANK_STEP.x*multiplier,y:(coordinate.edp-cEdp)*RANK_STEP.y*1.7+(coordinate.tp-cTp)*RANK_STEP.y*.66,z:(cEp-coordinate.ep)*RANK_STEP.z*multiplier};
       if(secondaryAxes.has('tp')){
         if(first==='pp')position.y+=(cTp-coordinate.tp)*RANK_STEP.y*.62*multiplier;
-        else position.x+=(coordinate.tp-cTp)*RANK_STEP.x*.82*multiplier;
+        else position.y+=(cTp-coordinate.tp)*RANK_STEP.y*.62*multiplier;
       }
       if(secondaryAxes.has('edp'))position.z+=(cEdp-coordinate.edp)*RANK_STEP.z*(epFirst?.72:1.5)*multiplier;
       positions.set(manifest.rank,position);
@@ -171,6 +172,8 @@
   }
 
   function numericStyle(element,key){const value=Number.parseFloat(element.style[key]);return Number.isFinite(value)?value:0;}
+
+  function payloadPoint(template,x,y,depth){return{x:depth,y:(template.centerY-y)*SOURCE_SCALE,z:(x-template.centerX)*SOURCE_SCALE};}
 
   function sampleSvgPath(pathData,curveSteps=5){
     const tokens=String(pathData||'').match(/[A-Za-z]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi)||[],points=[];
@@ -233,22 +236,27 @@
     let model=base.getConfig({preset:typeof options.model==='string'?options.model:(options.preset||'openpangu-flash'),config:typeof options.model==='object'?options.model:options.config});
     let topology=normalizeTopology(options.topology||DEFAULT_TOPOLOGY),partitionRules=options.partitionRules||{},plan=partitionModel(model,topology,partitionRules);
     const spec=buildModelSceneSpec(base,model),params=new URLSearchParams(global.location?.search||'');
+    const showHeader=options.showHeader!==false,showInspector=options.showInspector!==false;
+    const overviewLayout=options.overviewLayout==='server-grid'?'server-grid':options.overviewLayout==='grid'?'grid':'row';
+    const overviewColumns=Math.max(1,Math.min(topology.worldSize,Number(options.overviewColumns)||Math.ceil(Math.sqrt(topology.worldSize*2))));
+    const ranksPerServer=Math.max(1,Math.min(topology.worldSize,Number(options.ranksPerServer)||8)),serverColumns=Math.max(1,Number(options.serverColumns)||4);
+    const cameraFov=clamp(Number(options.cameraFov)||16,6,35);
     const requestedScene=options.initialState?.sceneMode||params.get('scene')||'exploded',requestedTopology=options.initialState?.groupingAxes||options.initialState?.topologyMode||params.get('topology')||'standard',requestedGroupingAxes=normalizeGroupingAxes(requestedTopology);
     const requestedRank=options.initialState?.selectedRank??(params.has('rank')?Number(params.get('rank')):null),requestedLayer=options.initialState?.selectedLayer??(params.has('layer')?Number(params.get('layer')):null);
     const state={
       sceneMode:SCENE_MODES.has(requestedScene)?requestedScene:'packed',groupingAxes:requestedGroupingAxes,topologyMode:topologyModeForAxes(requestedGroupingAxes),
       theme:THEMES.has(options.initialState?.theme)?options.initialState.theme:(params.get('theme')==='light'?'light':document.documentElement.dataset.theme==='light'?'light':'dark'),
       selectedRank:Number.isInteger(requestedRank)&&plan.manifestByRank.has(requestedRank)?requestedRank:null,selectedLayer:Number.isInteger(requestedLayer)?requestedLayer:null,
-      selectedNode:null,selectedGroup:null,hoveredRank:null,camera:{...ISOMETRIC_POSE,zoom:1,fitHalfHeight:72,target:{x:0,y:0,z:0}},ready:false
+      selectedNode:null,selectedGroup:null,communicationGroupFocus:false,hoveredRank:null,camera:{...ISOMETRIC_POSE,zoom:1,fitHalfHeight:72,target:{x:0,y:0,z:0}},ready:false
     };
     if(state.sceneMode==='rank'&&state.selectedRank===null)state.sceneMode='packed';
     let destroyed=false,dirty=true,renderRaf=0,layoutTweenRaf=0,pointer=null,hoverRaf=0;
 
-    root.classList.add('pto-model-rank-deck','pto-model-rank-three');root.dataset.sharedPattern='model-parallel-rank-deck';root.dataset.sceneMode=state.sceneMode;root.dataset.topologyMode=state.topologyMode;root.dataset.groupingAxes=state.groupingAxes.join(' ');root.dataset.theme=state.theme;
+    root.classList.add('pto-model-rank-deck','pto-model-rank-three');root.dataset.sharedPattern='model-parallel-rank-deck';root.dataset.sceneMode=state.sceneMode;root.dataset.topologyMode=state.topologyMode;root.dataset.groupingAxes=state.groupingAxes.join(' ');root.dataset.theme=state.theme;root.dataset.showHeader=String(showHeader);root.dataset.showInspector=String(showInspector);root.dataset.overviewLayout=overviewLayout;
     const d=topology.dimensions;
     root.innerHTML=`
-      <header class="pto-model-rank-deck__header" data-stage-ui>
-        <div class="pto-model-rank-deck__identity"><b>${esc(model.label)}</b><span>Three.js / ${plan.topology.worldSize} ranks / complete Layer payload</span></div>
+      <header class="pto-model-rank-deck__header" data-stage-ui${showHeader?'':' hidden'}>
+        <div class="pto-model-rank-deck__identity"><b>${esc(model.label)}</b><span>Three.js / ${plan.topology.worldSize} ranks / 选择切分查看 Layers</span></div>
         <div class="pto-model-rank-deck__grouping-panel" role="group" aria-label="当前范围下继续分组">
           <button type="button" class="pto-model-rank-deck__scope" data-grouping-reset aria-label="恢复全部 ${plan.topology.worldSize} 个 Rank">
             <span>当前范围</span><b data-grouping-scope>全部 · ${plan.topology.worldSize} Ranks</b>
@@ -268,14 +276,14 @@
           <div class="pto-model-rank-deck__control"><button type="button" data-rank-theme>浅色</button></div>
         </div>
       </header>
-      <div class="pto-model-rank-deck__viewport" tabindex="0" aria-label="128 Rank Three.js topology viewport">
+      <div class="pto-model-rank-deck__viewport" tabindex="0" aria-label="128 Rank Three.js topology viewport" title="拖动旋转 · Command/Ctrl + 拖动平移 · 滚轮缩放">
         <div class="pto-model-rank-deck__canvas"></div>
         <div class="pto-model-rank-deck__group-badge" aria-live="polite"></div>
         <div class="pto-model-rank-deck__tooltip" role="tooltip"></div>
         <div class="pto-model-rank-deck__loading" role="status"><b>正在编译完整 Layer 到 GPU 批次</b><span>ModelSceneSpec → RankManifest</span><i><em style="width:72%"></em></i></div>
         <div class="pto-model-rank-deck__a11y" aria-live="polite"></div>
       </div>
-      <aside class="pto-model-rank-deck__inspector" data-stage-ui aria-live="polite"></aside>`;
+      <aside class="pto-model-rank-deck__inspector" data-stage-ui aria-live="polite"${showInspector?'':' hidden'}></aside>`;
     const viewport=root.querySelector('.pto-model-rank-deck__viewport'),canvasHost=root.querySelector('.pto-model-rank-deck__canvas'),inspector=root.querySelector('.pto-model-rank-deck__inspector'),tooltip=root.querySelector('.pto-model-rank-deck__tooltip'),groupBadge=root.querySelector('.pto-model-rank-deck__group-badge'),zoomReadout=root.querySelector('[data-rank-zoom]'),scopeReadout=root.querySelector('[data-grouping-scope]'),loading=root.querySelector('.pto-model-rank-deck__loading'),a11y=root.querySelector('.pto-model-rank-deck__a11y');
     base.applySemanticPalette(root,state.theme);
 
@@ -283,8 +291,16 @@
     renderer.setPixelRatio(Math.min(global.devicePixelRatio||1,1.5));
     if('outputColorSpace'in renderer&&THREE.SRGBColorSpace)renderer.outputColorSpace=THREE.SRGBColorSpace;
     canvasHost.appendChild(renderer.domElement);
-    const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(16,1,.1,2400),raycaster=new THREE.Raycaster(),pointerNdc=new THREE.Vector2(),dummy=new THREE.Object3D(),tempColor=new THREE.Color(),tempTint=new THREE.Color();
+    const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(cameraFov,1,.1,4000),raycaster=new THREE.Raycaster(),pointerNdc=new THREE.Vector2(),dummy=new THREE.Object3D(),tempColor=new THREE.Color(),tempTint=new THREE.Color();
     scene.add(new THREE.AmbientLight(0xffffff,1.12));const keyLight=new THREE.DirectionalLight(0xffffff,1.6);keyLight.position.set(50,80,90);scene.add(keyLight);const fillLight=new THREE.DirectionalLight(0x7dd3fc,.5);fillLight.position.set(-40,10,-60);scene.add(fillLight);
+    const groundGridSize=Math.max(72,overviewColumns*RANK_STEP.x*1.4,Math.ceil(topology.worldSize/overviewColumns)*RANK_STEP.z*1.35),groundGrid=options.showGroundGrid===true?new THREE.GridHelper(groundGridSize,Math.max(16,Math.ceil(groundGridSize/5)),'#d4d7db','#d4d7db'):null;
+    if(groundGrid){groundGrid.position.y=-RANK_SIZE.y/2-.7;groundGrid.material.transparent=true;groundGrid.material.depthWrite=false;groundGrid.material.opacity=state.theme==='light'?.46:.32;groundGrid.renderOrder=-2;scene.add(groundGrid);}
+    const trafficCanvas=document.createElement('canvas');trafficCanvas.width=1400;trafficCanvas.height=720;
+    const trafficTexture=new THREE.CanvasTexture(trafficCanvas);if('colorSpace'in trafficTexture&&THREE.SRGBColorSpace)trafficTexture.colorSpace=THREE.SRGBColorSpace;trafficTexture.minFilter=THREE.LinearFilter;trafficTexture.magFilter=THREE.LinearFilter;
+    const trafficMaterial=new THREE.MeshBasicMaterial({map:trafficTexture,transparent:true,depthWrite:false,depthTest:true,side:THREE.DoubleSide,toneMapped:false});
+    const trafficPlane=new THREE.Mesh(new THREE.PlaneGeometry(1,1),trafficMaterial);trafficPlane.rotation.x=-Math.PI/2;trafficPlane.position.y=-RANK_SIZE.y/2-.48;trafficPlane.renderOrder=-1;trafficPlane.visible=false;scene.add(trafficPlane);
+    const serverFrameGroup=new THREE.Group();serverFrameGroup.renderOrder=-1;scene.add(serverFrameGroup);
+    let floorTraffic={ranks:[],flows:[],localByRank:{},rankColorSlots:{}},floorTrafficFocus=new Set();
     const nodeBatches=new Map(),edgeBatches=new Map(),rankPositions=new Map(),shellDisplayPositions=new Map(),sceneIndex={nodes:new Map(),edges:new Map(),layers:new Map(),ranks:new Map()};
     const layerMetas=[],clusterMetas=[],nodeMetasByRank=new Map(),edgeSemanticCounts={};
 
@@ -293,23 +309,22 @@
     let colors=palette();
     const backgroundColor=()=>getComputedStyle(root).getPropertyValue('--background').trim()||(state.theme==='light'?'#f8fafc':'#070b14');
 
-    function localPoint(template,x,y,z){return{x:(x-template.centerX)*SOURCE_SCALE,y:(template.centerY-y)*SOURCE_SCALE,z};}
-    function templatePlacement(manifest,template,localZ,role='layer'){
+    function templatePlacement(manifest,template,localDepth,role='layer'){
       const placementId=role==='layer'?`rank:${manifest.rank}/layer:${template.layer}`:`rank:${manifest.rank}/static:${role}`,solid=role==='layer'&&template.layer===manifest.layerSegments[0].start;
-      const card={id:placementId,rank:manifest.rank,layer:template.layer,role,solid,local:{x:0,y:0,z:localZ-.08},scale:{x:Math.min(RANK_SIZE.x-.7,template.width*SOURCE_SCALE+.38),y:Math.min(RANK_SIZE.y-.7,template.height*SOURCE_SCALE+.38),z:.035}};
+      const card={id:placementId,rank:manifest.rank,layer:template.layer,role,solid,local:{x:localDepth-.08,y:0,z:0},scale:{x:.035,y:Math.min(RANK_SIZE.y-.7,template.height*SOURCE_SCALE+.38),z:Math.min(RANK_SIZE.z-.7,template.width*SOURCE_SCALE+.38)}};
       layerMetas.push(card);sceneIndex.layers.set(placementId,card);
       template.clusters.forEach(cluster=>{
-        const p=localPoint(template,cluster.x+cluster.w/2,cluster.y+cluster.h/2,localZ-.035);
-        clusterMetas.push({id:`${placementId}/cluster:${cluster.id}`,rank:manifest.rank,layer:template.layer,role,solid,label:cluster.label,local:p,scale:{x:cluster.w*SOURCE_SCALE,y:cluster.h*SOURCE_SCALE,z:.045}});
+        const p=payloadPoint(template,cluster.x+cluster.w/2,cluster.y+cluster.h/2,localDepth-.035);
+        clusterMetas.push({id:`${placementId}/cluster:${cluster.id}`,rank:manifest.rank,layer:template.layer,role,solid,label:cluster.label,local:p,scale:{x:.045,y:cluster.h*SOURCE_SCALE,z:cluster.w*SOURCE_SCALE}});
       });
       template.nodes.forEach(node=>{
-        const p=localPoint(template,node.x+node.w/2,node.y+node.h/2,localZ+NODE_DEPTH/2),semanticId=`${placementId}/node:${node.id}`;
-        const meta={semanticId,rank:manifest.rank,layer:template.layer,role,solid,nodeId:node.id,label:node.label,op:node.op,description:node.description,sourceIndex:node.sourceIndex,ownership:ownershipForNode(node.id,manifest),local:p,scale:{x:Math.max(.12,node.w*SOURCE_SCALE),y:Math.max(.1,node.h*SOURCE_SCALE),z:NODE_DEPTH}},batchKey=`${node.op}:${solid?'solid':'ghost'}`;
+        const p=payloadPoint(template,node.x+node.w/2,node.y+node.h/2,localDepth+NODE_DEPTH/2),semanticId=`${placementId}/node:${node.id}`;
+        const meta={semanticId,rank:manifest.rank,layer:template.layer,role,solid,nodeId:node.id,label:node.label,op:node.op,description:node.description,sourceIndex:node.sourceIndex,ownership:ownershipForNode(node.id,manifest),local:p,scale:{x:NODE_DEPTH,y:Math.max(.1,node.h*SOURCE_SCALE),z:Math.max(.12,node.w*SOURCE_SCALE)}},batchKey=`${node.op}:${solid?'solid':'ghost'}`;
         if(!nodeBatches.has(batchKey))nodeBatches.set(batchKey,{key:batchKey,op:node.op,tone:solid?'solid':'ghost',metas:[],mesh:null});nodeBatches.get(batchKey).metas.push(meta);sceneIndex.nodes.set(semanticId,meta);
         if(!nodeMetasByRank.has(manifest.rank))nodeMetasByRank.set(manifest.rank,[]);nodeMetasByRank.get(manifest.rank).push(meta);
       });
       template.edges.forEach(edge=>{
-        const semanticId=`${placementId}/edge:${edge.source}->${edge.target}:${edge.sourceIndex}`,points=edge.points.map(point=>localPoint(template,point.x,point.y,localZ+NODE_DEPTH+.012));
+        const semanticId=`${placementId}/edge:${edge.source}->${edge.target}:${edge.sourceIndex}`,points=edge.points.map(point=>payloadPoint(template,point.x,point.y,localDepth+NODE_DEPTH+.012));
         const meta={semanticId,rank:manifest.rank,layer:template.layer,role,solid,kind:edge.kind,source:edge.source,target:edge.target,points},batchKey=`${edge.kind}:${solid?'solid':'ghost'}`;
         if(!edgeBatches.has(batchKey))edgeBatches.set(batchKey,{key:batchKey,kind:edge.kind,tone:solid?'solid':'ghost',metas:[],segments:[],line:null});edgeBatches.get(batchKey).metas.push(meta);sceneIndex.edges.set(semanticId,meta);edgeSemanticCounts[edge.kind]=(edgeSemanticCounts[edge.kind]||0)+1;
       });
@@ -317,9 +332,9 @@
 
     plan.manifests.forEach(manifest=>{
       sceneIndex.ranks.set(manifest.rank,manifest);const [segment]=manifest.layerSegments,count=segment.end-segment.start+1;
-      for(let layer=segment.start;layer<=segment.end;layer+=1){const localIndex=layer-segment.start,localZ=((count-1)/2-localIndex)*LAYER_GAP;templatePlacement(manifest,spec.layers[layer],localZ,'layer');}
-      if(manifest.staticRoles.includes('input'))templatePlacement(manifest,spec.static.input,(count/2+.58)*LAYER_GAP,'input');
-      if(manifest.staticRoles.includes('output'))templatePlacement(manifest,spec.static.output,-(count/2+.58)*LAYER_GAP,'output');
+      for(let layer=segment.start;layer<=segment.end;layer+=1){const localIndex=layer-segment.start,localDepth=(localIndex-(count-1)/2)*LAYER_GAP;templatePlacement(manifest,spec.layers[layer],localDepth,'layer');}
+      if(manifest.staticRoles.includes('input'))templatePlacement(manifest,spec.static.input,-(count/2+.58)*LAYER_GAP,'input');
+      if(manifest.staticRoles.includes('output'))templatePlacement(manifest,spec.static.output,(count/2+.58)*LAYER_GAP,'output');
     });
     const expected=plan.manifests.reduce((totals,manifest)=>{
       const [segment]=manifest.layerSegments;
@@ -360,10 +375,10 @@
       return best;
     }
     function operatorLabelTexture(label,nodeWidth){
-      const fontSize=42,lineHeight=48,worldPerPixel=.0045,padding=6,maxWidth=clamp(Math.floor(nodeWidth/worldPerPixel)-padding*2,84,480),key=`${label}:${maxWidth}`;
+      const fontSize=42,lineHeight=48,worldPerPixel=.0045,padding=6,maxWidth=clamp(Math.floor(nodeWidth/worldPerPixel)-padding*2,84,480),key=`${state.theme}:${label}:${maxWidth}`;
       if(operatorLabelTextures.has(key))return operatorLabelTextures.get(key);
       const canvas=document.createElement('canvas');let context=canvas.getContext('2d');context.font=`600 ${fontSize}px Inter, system-ui, sans-serif`;const lines=labelLines(label,context,maxWidth),textWidth=Math.ceil(Math.max(...lines.map(line=>context.measureText(line).width)));
-      canvas.width=Math.max(1,textWidth+padding*2);canvas.height=lines.length*lineHeight+padding*2;context=canvas.getContext('2d');context.font=`600 ${fontSize}px Inter, system-ui, sans-serif`;context.textAlign='center';context.textBaseline='middle';context.fillStyle='#111111';
+      canvas.width=Math.max(1,textWidth+padding*2);canvas.height=lines.length*lineHeight+padding*2;context=canvas.getContext('2d');context.font=`600 ${fontSize}px Inter, system-ui, sans-serif`;context.textAlign='center';context.textBaseline='middle';context.fillStyle=state.theme==='light'?'#111827':'#e5eefb';
       lines.forEach((line,index)=>context.fillText(line,canvas.width/2,padding+lineHeight*(index+.5)));
       const texture=new THREE.CanvasTexture(canvas);if('colorSpace'in texture&&THREE.SRGBColorSpace)texture.colorSpace=THREE.SRGBColorSpace;texture.minFilter=THREE.LinearFilter;texture.magFilter=THREE.LinearFilter;const asset={texture,width:canvas.width*worldPerPixel,height:canvas.height*worldPerPixel};operatorLabelTextures.set(key,asset);return asset;
     }
@@ -373,15 +388,17 @@
       if(ownership?.axis==='ep'){if(meta.nodeId==='expert_pool')return`${meta.label} · E${manifest.expertOwnership.start}–E${manifest.expertOwnership.end}`;return`${meta.label} · EP${ownership.index}/${ownership.count}`;}
       return meta.label;
     }
-    function addOperatorLabel(label,x,y,z,width,semanticId){const asset=operatorLabelTexture(label,width),material=new THREE.MeshBasicMaterial({map:asset.texture,transparent:true,depthTest:false,depthWrite:false,side:THREE.FrontSide,toneMapped:false}),labelMesh=new THREE.Mesh(operatorLabelGeometry,material);labelMesh.position.set(x,y,z);labelMesh.scale.set(asset.width,asset.height,1);labelMesh.renderOrder=20;labelMesh.userData.semanticId=semanticId;operatorLabelGroup.add(labelMesh);}
+    function addOperatorLabel(label,x,y,z,width,semanticId){const asset=operatorLabelTexture(label,width),material=new THREE.MeshBasicMaterial({map:asset.texture,transparent:true,depthTest:false,depthWrite:false,side:THREE.FrontSide,toneMapped:false}),labelMesh=new THREE.Mesh(operatorLabelGeometry,material);labelMesh.position.set(x,y,z);labelMesh.rotation.y=Math.PI/2;labelMesh.scale.set(asset.width,asset.height,1);labelMesh.renderOrder=20;labelMesh.userData.semanticId=semanticId;operatorLabelGroup.add(labelMesh);}
+    function addOverviewRankLabel(manifest){const rank=rankPositions.get(manifest.rank),asset=operatorLabelTexture(`R${manifest.rank}`,5),group=selectedGroup(),member=!group||group.ranks.includes(manifest.rank),material=new THREE.SpriteMaterial({map:asset.texture,transparent:true,depthTest:false,depthWrite:false,opacity:member?1:(state.theme==='light'?.16:.42),toneMapped:false}),label=new THREE.Sprite(material);label.position.set(rank.x,rank.y+RANK_SIZE.y/2+1.05,rank.z);const scale=Math.max(3.2,asset.width*4.6);label.scale.set(scale,Math.max(.92,asset.height*4.6),1);label.renderOrder=21;label.userData.semanticId=`rank:${manifest.rank}/overview-label`;operatorLabelGroup.add(label);}
     function updateOperatorLabels(){
-      clearOperatorLabels();if(state.sceneMode!=='rank'||state.selectedRank===null)return;
+      clearOperatorLabels();
+      if(state.sceneMode!=='rank'||state.selectedRank===null){if(options.showOverviewLabels!==false)plan.manifests.forEach(addOverviewRankLabel);return;}
       const rank=rankPositions.get(state.selectedRank),manifest=plan.manifestByRank.get(state.selectedRank),frontLayer=manifest?.layerSegments[0]?.start;if(!rank||frontLayer===undefined)return;
-      const [segment]=manifest.layerSegments,e=manifest.expertOwnership,c=manifest.coordinate,frontNodes=(nodeMetasByRank.get(state.selectedRank)||[]).filter(meta=>meta.layer===frontLayer),frontZ=Math.max(...frontNodes.map(meta=>meta.local.z+meta.scale.z*.52));
-      frontNodes.forEach(meta=>addOperatorLabel(payloadNodeLabel(meta,manifest),rank.x+meta.local.x,rank.y+meta.local.y,rank.z+meta.local.z+meta.scale.z*.52,meta.scale.x*.9,meta.semanticId));
-      addOperatorLabel(`R${manifest.rank} · PP${c.pp} L${segment.start}–L${segment.end} · TP${c.tp}/${topology.dimensions.tp} · EP${c.ep}/${topology.dimensions.ep} E${e.start}–E${e.end} · EDP${c.edp}/${topology.dimensions.edp}`,rank.x,rank.y+RANK_SIZE.y/2-.34,rank.z+frontZ+.012,RANK_SIZE.x-1,`rank:${manifest.rank}/payload`);
+      const [segment]=manifest.layerSegments,e=manifest.expertOwnership,c=manifest.coordinate,frontNodes=(nodeMetasByRank.get(state.selectedRank)||[]).filter(meta=>meta.layer===frontLayer),frontX=Math.max(...frontNodes.map(meta=>meta.local.x+meta.scale.x*.52));
+      frontNodes.forEach(meta=>addOperatorLabel(payloadNodeLabel(meta,manifest),rank.x+meta.local.x+meta.scale.x*.52,rank.y+meta.local.y,rank.z+meta.local.z,meta.scale.z*.9,meta.semanticId));
+      addOperatorLabel(`R${manifest.rank} · PP${c.pp} L${segment.start}–L${segment.end} · TP${c.tp}/${topology.dimensions.tp} · EP${c.ep}/${topology.dimensions.ep} E${e.start}–E${e.end} · EDP${c.edp}/${topology.dimensions.edp}`,rank.x+frontX+.012,rank.y+RANK_SIZE.y/2-.34,rank.z,RANK_SIZE.z-1,`rank:${manifest.rank}/payload`);
     }
-    function compose(meta,index,mesh){const rank=rankPositions.get(meta.rank),hidden=(state.sceneMode==='rank'&&state.selectedRank!==null&&meta.rank!==state.selectedRank)||(payloadVisibleRanks&&!payloadVisibleRanks.has(meta.rank));dummy.position.set(rank.x+meta.local.x,rank.y+meta.local.y,rank.z+meta.local.z);dummy.rotation.set(0,0,0);dummy.scale.set(hidden?.0001*meta.scale.x:meta.scale.x,hidden?.0001*meta.scale.y:meta.scale.y,hidden?.0001*meta.scale.z:meta.scale.z);dummy.updateMatrix();mesh.setMatrixAt(index,dummy.matrix);}
+    function compose(meta,index,mesh){const rank=rankPositions.get(meta.rank),hidden=(state.sceneMode==='rank'&&state.selectedRank!==null&&meta.rank!==state.selectedRank)||(payloadVisibleRanks&&!payloadVisibleRanks.has(meta.rank));dummy.position.set(rank.x+meta.local.x,rank.y+meta.local.y,rank.z+meta.local.z);dummy.rotation.set(0,0,0);dummy.scale.set(hidden?0:meta.scale.x,hidden?0:meta.scale.y,hidden?0:meta.scale.z);dummy.updateMatrix();mesh.setMatrixAt(index,dummy.matrix);}
     function boxEdges(center,size,target,offset){
       const hx=size.x/2,hy=size.y/2,hz=size.z/2,corners=[[-hx,-hy,-hz],[hx,-hy,-hz],[hx,hy,-hz],[-hx,hy,-hz],[-hx,-hy,hz],[hx,-hy,hz],[hx,hy,hz],[-hx,hy,hz]],pairs=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
       let cursor=offset;pairs.forEach(pair=>pair.forEach(id=>{target[cursor++]=center.x+corners[id][0];target[cursor++]=center.y+corners[id][1];target[cursor++]=center.z+corners[id][2];}));return cursor;
@@ -394,38 +411,75 @@
     function rankColor(manifest){
       const group=selectedGroup(),member=!group||group.ranks.includes(manifest.rank);let value='#64748b';
       const axis=state.groupingAxes[state.groupingAxes.length-1];if(axis==='pp')value=PP_COLORS[manifest.coordinate.pp%PP_COLORS.length];else if(axis==='tp')value=TP_COLORS[manifest.coordinate.tp%TP_COLORS.length];else if(axis==='ep')value=EP_COLORS[manifest.coordinate.ep%EP_COLORS.length];else if(axis==='edp')value=EDP_COLORS[manifest.coordinate.edp%EDP_COLORS.length];
-      tempColor.set(value);if(!member)tempColor.lerp(new THREE.Color(backgroundColor()),.985);if(manifest.rank===state.selectedRank)tempColor.lerp(new THREE.Color('#ffffff'),.28);return tempColor.clone();
+      tempColor.set(value);if(!member)tempColor.lerp(new THREE.Color(backgroundColor()),state.theme==='light'?.985:.72);if(manifest.rank===state.selectedRank)tempColor.lerp(new THREE.Color('#ffffff'),.28);return tempColor.clone();
     }
     function visualFactor(meta){const group=selectedGroup();if(group&&!group.ranks.includes(meta.rank))return .08;if(state.sceneMode==='rank'&&state.selectedRank!==null&&meta.rank!==state.selectedRank)return .035;if(state.selectedRank===meta.rank&&state.selectedLayer!==null&&meta.layer!==null&&meta.layer!==state.selectedLayer)return .26;return 1;}
     function fadedColor(value,factor){const color=new THREE.Color(value),background=new THREE.Color(backgroundColor());return color.lerp(background,1-factor);}
 
+    function overviewPosition(manifest,mode){
+      if(overviewLayout==='server-grid'){
+        const multiplier=mode==='exploded'?1.18:1,server=Math.floor(manifest.rank/ranksPerServer),local=manifest.rank%ranksPerServer,serverCount=Math.ceil(topology.worldSize/ranksPerServer),serverRows=Math.ceil(serverCount/serverColumns),serverColumn=server%serverColumns,serverRow=Math.floor(server/serverColumns),localColumns=Math.min(4,ranksPerServer),localRows=Math.ceil(ranksPerServer/localColumns),localColumn=local%localColumns,localRow=Math.floor(local/localColumns),serverStepX=localColumns*RANK_STEP.x*1.28+RANK_STEP.x*1.4,serverStepZ=localRows*RANK_STEP.z*1.34+RANK_STEP.z*1.5;
+        return{x:((serverColumn-(serverColumns-1)/2)*serverStepX+(localColumn-(localColumns-1)/2)*RANK_STEP.x*1.28)*multiplier,y:0,z:(((serverRows-1)/2-serverRow)*serverStepZ+((localRows-1)/2-localRow)*RANK_STEP.z*1.34)*multiplier};
+      }
+      if(overviewLayout!=='grid')return layoutPosition(manifest.coordinate,topology,mode,'standard');
+      const multiplier=mode==='exploded'?1.18:1,row=Math.floor(manifest.rank/overviewColumns),column=manifest.rank%overviewColumns;
+      const rowCount=Math.ceil(topology.worldSize/overviewColumns),lastRowCount=topology.worldSize%overviewColumns||overviewColumns;
+      const activeColumns=row===rowCount-1?lastRowCount:overviewColumns;
+      return{x:(column-(activeColumns-1)/2)*RANK_STEP.x*1.16*multiplier,y:0,z:((rowCount-1)/2-row)*RANK_STEP.z*1.2*multiplier};
+    }
     function updateLayout(){
-      const mode=state.sceneMode==='packed'?'packed':'exploded',group=selectedGroup();currentGroupingLayout=state.groupingAxes.length?buildHierarchicalRankLayout(plan.manifests,state.groupingAxes,mode,topology):null;payloadVisibleRanks=group?new Set(group.ranks):null;plan.manifests.forEach((manifest,index)=>{const p=currentGroupingLayout?.positions.get(manifest.rank)||layoutPosition(manifest.coordinate,topology,mode,'standard'),hidden=state.sceneMode==='rank'&&state.selectedRank!==null&&manifest.rank!==state.selectedRank;rankPositions.set(manifest.rank,p);shellDisplayPositions.set(manifest.rank,{...p});dummy.position.set(p.x,p.y,p.z);dummy.rotation.set(0,0,0);dummy.scale.setScalar(hidden?.0001:1);dummy.updateMatrix();rankMesh.setMatrixAt(index,dummy.matrix);rankMesh.setColorAt(index,rankColor(manifest));});rankMesh.instanceMatrix.needsUpdate=true;if(rankMesh.instanceColor)rankMesh.instanceColor.needsUpdate=true;
+      if(groundGrid)groundGrid.visible=state.sceneMode!=='rank';
+      const mode=state.sceneMode==='packed'?'packed':'exploded',group=selectedGroup(),payloadEnabled=state.groupingAxes.length>0||state.sceneMode==='rank';currentGroupingLayout=state.groupingAxes.length?buildHierarchicalRankLayout(plan.manifests,state.groupingAxes,mode,topology):null;payloadVisibleRanks=payloadEnabled?(group?new Set(group.ranks):null):new Set();root.dataset.payloadVisible=String(payloadEnabled);plan.manifests.forEach((manifest,index)=>{const p=currentGroupingLayout?.positions.get(manifest.rank)||overviewPosition(manifest,mode),hidden=state.sceneMode==='rank'&&state.selectedRank!==null&&manifest.rank!==state.selectedRank;rankPositions.set(manifest.rank,p);shellDisplayPositions.set(manifest.rank,{...p});dummy.position.set(p.x,p.y,p.z);dummy.rotation.set(0,0,0);dummy.scale.setScalar(hidden?.0001:1);dummy.updateMatrix();rankMesh.setMatrixAt(index,dummy.matrix);rankMesh.setColorAt(index,rankColor(manifest));});rankMesh.instanceMatrix.needsUpdate=true;if(rankMesh.instanceColor)rankMesh.instanceColor.needsUpdate=true;
       layerMetas.forEach((meta,index)=>compose(meta,index,cardMesh));cardMesh.instanceMatrix.needsUpdate=true;
       clusterMetas.forEach((meta,index)=>compose(meta,index,clusterMesh));clusterMesh.instanceMatrix.needsUpdate=true;
       nodeBatches.forEach(batch=>{batch.metas.forEach((meta,index)=>compose(meta,index,batch.mesh));batch.mesh.instanceMatrix.needsUpdate=true;});
       edgeBatches.forEach(batch=>{const array=batch.line.geometry.attributes.position.array;let cursor=0;batch.segments.forEach(segment=>{const rank=rankPositions.get(segment.meta.rank),hidden=(state.sceneMode==='rank'&&state.selectedRank!==null&&segment.meta.rank!==state.selectedRank)||(payloadVisibleRanks&&!payloadVisibleRanks.has(segment.meta.rank));if(hidden){array[cursor++]=0;array[cursor++]=0;array[cursor++]=0;array[cursor++]=0;array[cursor++]=0;array[cursor++]=0;}else{array[cursor++]=rank.x+segment.a.x;array[cursor++]=rank.y+segment.a.y;array[cursor++]=rank.z+segment.a.z;array[cursor++]=rank.x+segment.b.x;array[cursor++]=rank.y+segment.b.y;array[cursor++]=rank.z+segment.b.z;}});batch.line.geometry.attributes.position.needsUpdate=true;batch.line.geometry.computeBoundingSphere();});
       const visibleManifests=state.sceneMode==='rank'&&state.selectedRank!==null?[plan.manifestByRank.get(state.selectedRank)]:plan.manifests,positions=new Float32Array(visibleManifests.length*72),lineColors=new Float32Array(visibleManifests.length*72);let cursor=0,colorCursor=0;
       visibleManifests.forEach(manifest=>{cursor=boxEdges(rankPositions.get(manifest.rank),RANK_SIZE,positions,cursor);const color=rankColor(manifest);for(let i=0;i<24;i+=1){lineColors[colorCursor++]=color.r;lineColors[colorCursor++]=color.g;lineColors[colorCursor++]=color.b;}});
-      outlineGeometry.setAttribute('position',new THREE.BufferAttribute(positions,3));outlineGeometry.setAttribute('color',new THREE.BufferAttribute(lineColors,3));outlineGeometry.computeBoundingSphere();updateCommunication();updateParallelFrames();updateSelection();requestRender();
+      outlineGeometry.setAttribute('position',new THREE.BufferAttribute(positions,3));outlineGeometry.setAttribute('color',new THREE.BufferAttribute(lineColors,3));outlineGeometry.computeBoundingSphere();updateCommunication();updateServerFrames();updateTrafficFloor();updateParallelFrames();updateSelection();requestRender();
     }
 
     function updateColors(){
+      if(groundGrid){const gridColor=new THREE.Color(state.theme==='light'?'#d4d7db':'#4b5563'),attribute=groundGrid.geometry.getAttribute('color');for(let index=0;index<attribute.count;index+=1)attribute.setXYZ(index,gridColor.r,gridColor.g,gridColor.b);attribute.needsUpdate=true;groundGrid.material.opacity=state.theme==='light'?.46:.32;}
       plan.manifests.forEach((manifest,index)=>rankMesh.setColorAt(index,rankColor(manifest)));if(rankMesh.instanceColor)rankMesh.instanceColor.needsUpdate=true;
       layerMetas.forEach((meta,index)=>{const manifest=plan.manifestByRank.get(meta.rank),stageColor=PP_COLORS[manifest.coordinate.pp%PP_COLORS.length],factor=visualFactor(meta),value=meta.solid?stageColor:GHOST_COLOR;cardMesh.setColorAt(index,fadedColor(value,meta.solid?Math.max(.72,factor):.11));});if(cardMesh.instanceColor)cardMesh.instanceColor.needsUpdate=true;
       clusterMetas.forEach((meta,index)=>{const factor=visualFactor(meta),value=meta.solid?(/MoE|FFN|专家/i.test(meta.label)?colors.moe:colors.attention):GHOST_COLOR;clusterMesh.setColorAt(index,fadedColor(value,meta.solid?Math.max(.68,factor):.1));});if(clusterMesh.instanceColor)clusterMesh.instanceColor.needsUpdate=true;
-      rankMaterial.opacity=state.theme==='light'?.018:.04;
+      rankMaterial.opacity=state.theme==='light'?.018:.16;
       nodeBatches.forEach(batch=>{batch.mesh.material.color.set('#ffffff');batch.metas.forEach((meta,index)=>{tempColor.set(batch.tone==='solid'?materialColor(batch.op):GHOST_COLOR);if(batch.tone==='solid'&&meta.ownership?.axis==='tp'){tempTint.set(TP_COLORS[meta.ownership.index%TP_COLORS.length]);tempColor.lerp(tempTint,.3);}else if(batch.tone==='solid'&&meta.ownership?.axis==='ep'){tempTint.set(EP_COLORS[meta.ownership.index%EP_COLORS.length]);tempColor.lerp(tempTint,.38);}batch.mesh.setColorAt(index,tempColor);});if(batch.mesh.instanceColor)batch.mesh.instanceColor.needsUpdate=true;batch.mesh.material.opacity=batch.tone==='solid'?(state.sceneMode==='rank'?.96:.9):(state.sceneMode==='rank'?.4:(state.theme==='light'?.028:.04));});
       edgeBatches.forEach(batch=>{batch.line.material.opacity=batch.tone==='solid'?(state.sceneMode==='rank'?.55:.25):(state.sceneMode==='rank'?.16:.014);});
       const lineColors=outlineGeometry.attributes.color?.array;if(lineColors){let cursor=0;const visibleManifests=state.sceneMode==='rank'&&state.selectedRank!==null?[plan.manifestByRank.get(state.selectedRank)]:plan.manifests;visibleManifests.forEach(manifest=>{const color=rankColor(manifest);for(let i=0;i<24;i+=1){lineColors[cursor++]=color.r;lineColors[cursor++]=color.g;lineColors[cursor++]=color.b;}});outlineGeometry.attributes.color.needsUpdate=true;}
-      updateSelection();requestRender();
+      updateServerFrames();updateSelection();requestRender();
     }
 
     function updateCommunication(){
       const group=selectedGroup();if(!group){commLines.visible=false;groupBadge.textContent='';return;}
+      if(group.axis==='server'){commLines.visible=false;groupBadge.textContent=`SERVER ${String(group.server??0).padStart(2,'0')} · ${group.ranks.length} cards · EP group`;return;}
       const members=group.ranks.map(rank=>plan.manifestByRank.get(rank)).sort((a,b)=>a.coordinate[group.axis]-b.coordinate[group.axis]),positions=[];
-      for(let index=0;index<members.length-1;index+=1){const a=rankPositions.get(members[index].rank),b=rankPositions.get(members[index+1].rank);positions.push(a.x,a.y,a.z,b.x,b.y,b.z);}
+      if(state.communicationGroupFocus){for(let source=0;source<members.length;source+=1)for(let target=source+1;target<members.length;target+=1){const a=rankPositions.get(members[source].rank),b=rankPositions.get(members[target].rank);positions.push(a.x,a.y,a.z,b.x,b.y,b.z);}}
+      else for(let index=0;index<members.length-1;index+=1){const a=rankPositions.get(members[index].rank),b=rankPositions.get(members[index+1].rank);positions.push(a.x,a.y,a.z,b.x,b.y,b.z);}
       commGeometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));commGeometry.computeBoundingSphere();commMaterial.color.set(TOPOLOGY_COLORS[group.axis]||'#38bdf8');commLines.visible=true;groupBadge.textContent=`${group.axis.toUpperCase()} · ${group.ranks.length} ranks · ${group.sourceLevel}`;
+      if(state.communicationGroupFocus)groupBadge.textContent=`${group.axis.toUpperCase()} group membership · ${group.ranks.length} ranks · not traffic`;
+    }
+    function updateServerFrames(){
+      [...serverFrameGroup.children].forEach(child=>{serverFrameGroup.remove(child);child.geometry?.dispose?.();child.material?.dispose?.();});serverFrameGroup.visible=overviewLayout==='server-grid'&&state.sceneMode!=='rank';if(!serverFrameGroup.visible)return;
+      const active=selectedGroup()?.server,serverCount=Math.ceil(topology.worldSize/ranksPerServer),floorY=-RANK_SIZE.y/2-.57;
+      for(let server=0;server<serverCount;server+=1){const ranks=Array.from({length:ranksPerServer},(_,index)=>server*ranksPerServer+index).filter(rank=>rankPositions.has(rank)),points=ranks.map(rank=>rankPositions.get(rank));if(!points.length)continue;const selected=server===active,padX=RANK_SIZE.x*.78,padZ=RANK_SIZE.z*.72,minX=Math.min(...points.map(point=>point.x))-padX,maxX=Math.max(...points.map(point=>point.x))+padX,minZ=Math.min(...points.map(point=>point.z))-padZ,maxZ=Math.max(...points.map(point=>point.z))+padZ,color=selected?(state.theme==='light'?0x4369ef:0x6f91ff):(state.theme==='light'?0xaeb4bd:0x94a3b8),positions=new Float32Array([minX,floorY,minZ,maxX,floorY,minZ,maxX,floorY,maxZ,minX,floorY,maxZ,minX,floorY,minZ]);
+        const surfaceColor=selected?color:(state.theme==='light'?0x111827:0xffffff),surfaceGeometry=new THREE.PlaneGeometry(maxX-minX,maxZ-minZ),surfaceMaterial=new THREE.MeshBasicMaterial({color:surfaceColor,transparent:true,opacity:selected?(state.theme==='light'?.11:.15):(state.theme==='light'?.018:.025),depthWrite:false,depthTest:true,side:THREE.DoubleSide,toneMapped:false}),surface=new THREE.Mesh(surfaceGeometry,surfaceMaterial);surface.rotation.x=-Math.PI/2;surface.position.set((minX+maxX)/2,floorY-.015,(minZ+maxZ)/2);surface.renderOrder=-1;surface.frustumCulled=false;serverFrameGroup.add(surface);
+        if(selected){const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));const material=new THREE.LineBasicMaterial({color,transparent:true,opacity:.9,depthWrite:false}),line=new THREE.Line(geometry,material);line.frustumCulled=false;serverFrameGroup.add(line);}
+        const asset=operatorLabelTexture(`SERVER ${String(server).padStart(2,'0')}`,8),labelMaterial=new THREE.SpriteMaterial({map:asset.texture,color,transparent:true,opacity:server===active?.96:(state.theme==='light'?.48:.62),depthTest:false,depthWrite:false,toneMapped:false}),label=new THREE.Sprite(labelMaterial);label.position.set(minX+RANK_SIZE.x*.65,floorY+.16,maxZ-RANK_SIZE.z*.25);label.scale.set(Math.max(6.4,asset.width*3.8),Math.max(1.05,asset.height*3.8),1);label.renderOrder=7;serverFrameGroup.add(label);
+      }
+    }
+    function updateTrafficFloor(){
+      const ranks=(floorTraffic.ranks||[]).filter(rank=>rankPositions.has(Number(rank))).map(Number);if(!ranks.length){trafficPlane.visible=false;return;}
+      const points=ranks.map(rank=>rankPositions.get(rank)),marginX=RANK_STEP.x*.9,marginZ=RANK_STEP.z*.9,minX=Math.min(...points.map(point=>point.x))-marginX,maxX=Math.max(...points.map(point=>point.x))+marginX,minZ=Math.min(...points.map(point=>point.z))-marginZ,maxZ=Math.max(...points.map(point=>point.z))+marginZ,spanX=Math.max(1,maxX-minX),spanZ=Math.max(1,maxZ-minZ),context=trafficCanvas.getContext('2d'),width=trafficCanvas.width,height=trafficCanvas.height;
+      context.clearRect(0,0,width,height);const light=state.theme==='light';context.fillStyle=light?'rgba(255,255,255,.9)':'rgba(20,20,20,.86)';context.fillRect(0,0,width,height);context.strokeStyle=light?'rgba(0,0,0,.07)':'rgba(255,255,255,.07)';context.lineWidth=1;
+      for(let x=0;x<=width;x+=56){context.beginPath();context.moveTo(x,0);context.lineTo(x,height);context.stroke();}for(let y=0;y<=height;y+=56){context.beginPath();context.moveTo(0,y);context.lineTo(width,y);context.stroke();}
+      const toCanvas=rank=>{const point=rankPositions.get(Number(rank));return{x:(point.x-minX)/spanX*width,y:(maxZ-point.z)/spanZ*height};},floorRankColor=rank=>{const slot=Number(floorTraffic.rankColorSlots?.[rank]??rank)%4;return RANK_PALETTE[((slot%4)+4)%4];},flows=(floorTraffic.flows||[]).filter(flow=>flow.sourceRank!==flow.targetRank&&ranks.includes(Number(flow.sourceRank))&&ranks.includes(Number(flow.targetRank))).sort((a,b)=>Number(a.sourceRank)-Number(b.sourceRank)||Number(a.targetRank)-Number(b.targetRank)),maxValue=Math.max(1,...flows.map(flow=>Number(flow.value)||0)),hasFocus=floorTrafficFocus.size>0,laneGap=Math.min(24,300/Math.max(1,flows.length));
+      flows.forEach((flow,index)=>{const source=toCanvas(flow.sourceRank),target=toCanvas(flow.targetRank),matches=(flow.eventIds||[]).some(id=>floorTrafficFocus.has(id)),laneY=height/2+(index-(flows.length-1)/2)*laneGap,sourceColor=floorRankColor(flow.sourceRank),targetColor=floorRankColor(flow.targetRank),gradient=context.createLinearGradient(source.x,source.y,target.x,target.y);gradient.addColorStop(0,sourceColor);gradient.addColorStop(1,targetColor);
+        context.save();context.globalAlpha=hasFocus?(matches?1:.07):.68;context.strokeStyle=gradient;context.lineWidth=4+18*Math.sqrt((Number(flow.value)||0)/maxValue);context.lineCap='round';context.lineJoin='round';context.beginPath();context.moveTo(source.x,source.y);context.lineTo(source.x,laneY);context.lineTo(target.x,laneY);context.lineTo(target.x,target.y);context.stroke();
+        const direction=Math.sign(target.y-laneY)||1,arrowX=target.x,arrowY=target.y-direction*(24+context.lineWidth),angle=direction>0?Math.PI/2:-Math.PI/2,size=10+context.lineWidth*.22;context.translate(arrowX,arrowY);context.rotate(angle);context.fillStyle=targetColor;context.beginPath();context.moveTo(size,0);context.lineTo(-size*.72,size*.55);context.lineTo(-size*.72,-size*.55);context.closePath();context.fill();context.restore();});
+      context.font='600 18px Inter, system-ui, sans-serif';context.textAlign='center';ranks.forEach(rank=>{const point=toCanvas(rank),record=floorTraffic.localByRank?.[rank],value=Number(record?.value??record??0),localFocused=(record?.eventIds||[]).some(id=>floorTrafficFocus.has(id));context.fillStyle=localFocused?'#4369ef':(light?'rgba(0,0,0,.72)':'rgba(255,255,255,.76)');context.fillText(`LOCAL ${value.toLocaleString()}`,point.x,point.y+38);});
+      trafficTexture.needsUpdate=true;trafficPlane.position.x=(minX+maxX)/2;trafficPlane.position.z=(minZ+maxZ)/2;trafficPlane.scale.set(spanX,spanZ,1);trafficPlane.visible=true;requestRender();
     }
     function clearParallelFrames(){
       [...parallelFrameGroup.children].forEach(child=>{parallelFrameGroup.remove(child);child.traverse(object=>{object.geometry?.dispose?.();if(Array.isArray(object.material))object.material.forEach(material=>material.dispose?.());else object.material?.dispose?.();});});
@@ -471,7 +525,7 @@
     }
     function fit(){
       if(state.sceneMode==='rank'&&state.selectedRank!==null){const p=rankPositions.get(state.selectedRank);state.camera.target={...p};state.camera.fitHalfHeight=9.2;}
-      else{const box=new THREE.Box3();plan.manifests.forEach(manifest=>{const p=rankPositions.get(manifest.rank);box.expandByPoint(new THREE.Vector3(p.x-RANK_SIZE.x/2,p.y-RANK_SIZE.y/2,p.z-RANK_SIZE.z/2));box.expandByPoint(new THREE.Vector3(p.x+RANK_SIZE.x/2,p.y+RANK_SIZE.y/2,p.z+RANK_SIZE.z/2));});const center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());state.camera.target={x:center.x,y:center.y,z:center.z};state.camera.fitHalfHeight=Math.max(24,size.length()*.52);}
+      else{const box=new THREE.Box3(),group=selectedGroup(),fitManifests=state.communicationGroupFocus&&group?group.ranks.map(rank=>plan.manifestByRank.get(rank)).filter(Boolean):plan.manifests;fitManifests.forEach(manifest=>{const p=rankPositions.get(manifest.rank);box.expandByPoint(new THREE.Vector3(p.x-RANK_SIZE.x/2,p.y-RANK_SIZE.y/2,p.z-RANK_SIZE.z/2));box.expandByPoint(new THREE.Vector3(p.x+RANK_SIZE.x/2,p.y+RANK_SIZE.y/2,p.z+RANK_SIZE.z/2));});const center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());state.camera.target={x:center.x,y:center.y,z:center.z};state.camera.fitHalfHeight=Math.max(24,size.length()*.52);}
       state.camera.zoom=1;setCamera();return api;
     }
     function resize(){const width=Math.max(1,viewport.clientWidth),height=Math.max(1,viewport.clientHeight);renderer.setSize(width,height,false);setCamera();}
@@ -492,7 +546,7 @@
         <section><h3>Pipeline Parallel · PP${d.pp}</h3><p>${stages.map(segment=>`PP${segment.stage}：L${segment.start}–L${segment.end}`).join('；')}。输入载荷只进入 PP0，最终 Norm、LM Head、Logits 与 MTP 位于 PP${d.pp-1}。</p></section>
         <section><h3>Tensor / Expert 切分</h3><p>TP${d.tp} 将 Attention、Linear、Dense FFN 等张量算子切成 ${d.tp} 份；EP${d.ep} 将 ${model.routedExperts} 个 Routed Experts 分成 ${d.ep} 组，每个 EP shard 持有 ${expertsPerShard} 个专家，并通过 Dispatch / Combine 完成跨 Rank 路由。</p></section>
         <section><h3>Replica / Context</h3><p>EDP${d.edp} 为相同的 PP × TP × EP 分片保留 ${d.edp} 份数据并行副本；CP${d.cp} 表示当前演示不再切分上下文序列。该 128 Rank 配置是产品演示映射，不宣称为官方训练部署参数。</p></section>
-        <section><h3>场景完整性 <small>${integrity.passed?'verified':'error'}</small></h3><p>${stats.layerInstances} 个 Layer placement、${stats.nodeInstances.toLocaleString()} 个算子实例和 ${stats.edgeInstances.toLocaleString()} 条边均保留在 GPU SceneIndex 中；概览仅隐藏文字，不简化模型结构。</p></section>
+        <section><h3>场景完整性 <small>${integrity.passed?'verified':'error'}</small></h3><p>${stats.layerInstances} 个 Layer placement、${stats.nodeInstances.toLocaleString()} 个算子实例和 ${stats.edgeInstances.toLocaleString()} 条边均保留在 GPU SceneIndex 中；默认 Rank 单行仅显示空容器，选择任一切分后显示完整模型结构。</p></section>
         <div class="pto-model-rank-deck__source"><i data-source="official"></i>模型源信息 <i data-source="derived"></i>并行推导 <i data-source="demo"></i>128 Rank 演示映射</div>`;return;
       }
       const manifest=plan.manifestByRank.get(state.selectedRank),c=manifest.coordinate,[segment]=manifest.layerSegments,e=manifest.expertOwnership,layers=Array.from({length:segment.end-segment.start+1},(_,index)=>segment.start+index),group=selectedGroup(),template=state.selectedLayer!==null?spec.layers[state.selectedLayer]:null;
@@ -517,12 +571,12 @@
     }
     function updateUrl(){if(options.syncUrl===false||!global.history?.replaceState)return;const url=new URL(global.location.href);url.searchParams.set('scene',state.sceneMode);url.searchParams.set('topology',state.groupingAxes.length?state.groupingAxes.join(','):'standard');url.searchParams.set('theme',state.theme);if(state.selectedRank===null)url.searchParams.delete('rank');else url.searchParams.set('rank',state.selectedRank);if(state.selectedLayer===null)url.searchParams.delete('layer');else url.searchParams.set('layer',state.selectedLayer);global.history.replaceState(null,'',url);}
     function sync({layout=false,refit=false}={}){state.topologyMode=topologyModeForAxes(state.groupingAxes);root.dataset.sceneMode=state.sceneMode;root.dataset.topologyMode=state.topologyMode;root.dataset.groupingAxes=state.groupingAxes.join(' ');root.dataset.theme=state.theme;document.documentElement.dataset.theme=state.theme;updateButtons();if(layout)updateLayout();else updateCommunication();updateColors();updateOperatorLabels();renderInspector();updateUrl();if(refit)fit();else setCamera();options.onStateChange?.(copy(state),api);}
-    function selectRank(rank){const next=Number(rank),manifest=plan.manifestByRank.get(next);if(!manifest)return null;state.selectedRank=next;const [segment]=manifest.layerSegments;if(state.selectedLayer===null||state.selectedLayer<segment.start||state.selectedLayer>segment.end)state.selectedLayer=segment.start;state.selectedNode=null;state.selectedGroup=null;a11y.textContent=`Selected Rank ${next}, Layer ${segment.start} to ${segment.end}`;sync({layout:state.sceneMode==='rank'||state.groupingAxes.length>0,refit:state.sceneMode==='rank'});options.onRankSelect?.(manifest,api);return manifest;}
-    function clearRankSelection(){if(state.sceneMode==='rank'||state.selectedRank===null&&state.selectedGroup===null)return false;state.selectedRank=null;state.selectedLayer=null;state.selectedNode=null;state.selectedGroup=null;state.hoveredRank=null;tooltip.classList.remove('is-visible');a11y.textContent='Rank selection cleared';sync({layout:true});return true;}
+    function selectRank(rank){const next=Number(rank),manifest=plan.manifestByRank.get(next);if(!manifest)return null;state.selectedRank=next;const [segment]=manifest.layerSegments;if(state.selectedLayer===null||state.selectedLayer<segment.start||state.selectedLayer>segment.end)state.selectedLayer=segment.start;state.selectedNode=null;state.selectedGroup=null;state.communicationGroupFocus=false;a11y.textContent=`Selected Rank ${next}, Layer ${segment.start} to ${segment.end}`;sync({layout:state.sceneMode==='rank'||state.groupingAxes.length>0,refit:state.sceneMode==='rank'});options.onRankSelect?.(manifest,api);return manifest;}
+    function clearRankSelection(){if(state.sceneMode==='rank'||state.selectedRank===null&&state.selectedGroup===null)return false;state.selectedRank=null;state.selectedLayer=null;state.selectedNode=null;state.selectedGroup=null;state.communicationGroupFocus=false;state.hoveredRank=null;tooltip.classList.remove('is-visible');a11y.textContent='Rank selection cleared';sync({layout:true});return true;}
     function enterRank(rank=state.selectedRank){if(selectRank(rank)===null)return api;state.sceneMode='rank';sync({layout:true,refit:true});return api;}
     function leaveRank(){if(state.sceneMode!=='rank')return api;state.sceneMode='exploded';state.selectedNode=null;sync({layout:true,refit:true});return api;}
     function setSceneMode(mode){if(!SCENE_MODES.has(mode))return api;if(mode==='rank')return enterRank();state.sceneMode=mode;state.selectedNode=null;sync({layout:true,refit:true});return api;}
-    function setGroupingAxes(axesInput=[]){const axes=normalizeGroupingAxes(axesInput),fromPositions=new Map([...shellDisplayPositions].map(([rank,p])=>[rank,{...p}]));state.groupingAxes=axes;state.selectedRank=null;state.selectedLayer=null;state.selectedNode=null;state.selectedGroup=null;if(state.sceneMode==='rank')state.sceneMode='exploded';sync({layout:true,refit:true});animateTopologyLayout(fromPositions);return api;}
+    function setGroupingAxes(axesInput=[]){const axes=normalizeGroupingAxes(axesInput),fromPositions=new Map([...shellDisplayPositions].map(([rank,p])=>[rank,{...p}]));state.groupingAxes=axes;state.selectedRank=null;state.selectedLayer=null;state.selectedNode=null;state.selectedGroup=null;state.communicationGroupFocus=false;if(state.sceneMode==='rank')state.sceneMode='exploded';sync({layout:true,refit:true});animateTopologyLayout(fromPositions);return api;}
     function setTopologyMode(mode){if(!TOPOLOGY_MODES.has(mode))return api;if(mode==='standard')return setGroupingAxes([]);return setGroupingAxes(toggleGroupingAxis(state.groupingAxes,mode));}
     function resetGrouping(){
       if(state.groupingAxes.length===0&&state.sceneMode!=='rank'&&state.selectedRank===null)return api;state.sceneMode='exploded';return setGroupingAxes([]);
@@ -531,16 +585,21 @@
     function selectLayer(layer,rank=state.selectedRank){const next=Number(layer);if(rank!==state.selectedRank)selectRank(rank);const manifest=plan.manifestByRank.get(state.selectedRank),segment=manifest?.layerSegments[0];if(!segment||!Number.isInteger(next)||next<segment.start||next>segment.end)return null;state.selectedLayer=next;state.selectedNode=null;sync();options.onLayerSelect?.(next,manifest,api);return next;}
     function selectNode(nodeId,layer=state.selectedLayer,rank=state.selectedRank){const semanticId=`rank:${rank}/layer:${layer}/node:${nodeId}`,meta=sceneIndex.nodes.get(semanticId);if(!meta)return null;state.selectedNode=meta;state.selectedLayer=meta.layer;updateSelection();updateOperatorLabels();renderInspector();requestRender();options.onNodeSelect?.(meta,api);return meta;}
     function selectExpert(expertId){const next=Number(expertId);if(!Number.isInteger(next)||next<0||next>=model.routedExperts)return null;const baseManifest=plan.manifestByRank.get(state.selectedRank??0),ep=Math.floor(next/(model.routedExperts/topology.dimensions.ep)),target=plan.manifests.find(item=>item.coordinate.pp===baseManifest.coordinate.pp&&item.coordinate.tp===baseManifest.coordinate.tp&&item.coordinate.cp===baseManifest.coordinate.cp&&item.coordinate.edp===baseManifest.coordinate.edp&&item.coordinate.ep===ep);if(!target)return null;enterRank(target.rank);return target;}
-    function selectGroup(groupId){const group=plan.groupById.get(groupId);if(!group)return null;state.selectedGroup=group.id;if(!state.groupingAxes.includes(group.axis))state.groupingAxes=[...state.groupingAxes,group.axis];if(state.selectedRank===null||!group.ranks.includes(state.selectedRank))state.selectedRank=group.ranks[0];sync({layout:true});return group;}
+    function selectGroup(groupId){const group=plan.groupById.get(groupId);if(!group)return null;state.selectedGroup=group.id;state.communicationGroupFocus=false;if(!state.groupingAxes.includes(group.axis))state.groupingAxes=[...state.groupingAxes,group.axis];if(state.selectedRank===null||!group.ranks.includes(state.selectedRank))state.selectedRank=group.ranks[0];sync({layout:true});return group;}
+    function focusCommunicationGroup(groupId){const group=plan.groupById.get(groupId);if(!group)return null;state.selectedGroup=group.id;state.communicationGroupFocus=true;state.selectedRank=null;state.selectedLayer=null;state.selectedNode=null;sync({layout:true});options.onGroupSelect?.(group,api);return group;}
+    function focusRankSet(ranksInput=[],meta={}){const ranks=[...new Set(ranksInput.map(Number).filter(rank=>plan.manifestByRank.has(rank)))];if(!ranks.length)return null;const group={id:meta.id||`server:${meta.server??0}`,axis:'server',label:meta.label||`Server ${meta.server??0}`,server:Number(meta.server)||0,ranks,sourceLevel:meta.sourceLevel||'demo'};plan.groupById.set(group.id,group);state.selectedGroup=group.id;state.communicationGroupFocus=true;state.selectedRank=null;state.selectedLayer=null;state.selectedNode=null;sync({layout:true,refit:true});options.onGroupSelect?.(group,api);return group;}
+    function setFloorTrafficData(data={}){floorTraffic={ranks:[...(data.ranks||floorTraffic.ranks||[])],flows:[...(data.flows||[])],localByRank:{...(data.localByRank||{})},rankColorSlots:{...(data.rankColorSlots||floorTraffic.rankColorSlots||{})}};updateTrafficFloor();return api;}
+    function focusFloorTrafficEventIds(ids=[]){floorTrafficFocus=new Set(ids);updateTrafficFloor();return api;}
+    function clearCommunicationGroup(){if(!state.selectedGroup)return api;state.selectedGroup=null;state.communicationGroupFocus=false;state.selectedRank=null;state.selectedLayer=null;state.selectedNode=null;sync({layout:true});options.onGroupSelect?.(null,api);return api;}
     function setPose(pose={}){if(Number.isFinite(Number(pose.rx)))state.camera.rx=Number(pose.rx);if(Number.isFinite(Number(pose.ry)))state.camera.ry=Number(pose.ry);if(Number.isFinite(Number(pose.zoom)))state.camera.zoom=clamp(Number(pose.zoom),.2,5);setCamera();return api;}
 
     function rootClick(event){
       const action=event.target.closest('[data-scene-mode],[data-topology-mode],[data-grouping-reset],[data-rank-fit],[data-rank-theme],[data-enter-selected],[data-inspector-layer],[data-inspector-node]');if(!action)return;
       if(action.dataset.sceneMode)setSceneMode(action.dataset.sceneMode);else if(action.dataset.topologyMode)setTopologyMode(action.dataset.topologyMode);else if(action.hasAttribute('data-grouping-reset'))resetGrouping();else if(action.hasAttribute('data-rank-fit'))fit();else if(action.hasAttribute('data-rank-theme'))setTheme(state.theme==='light'?'dark':'light');else if(action.hasAttribute('data-enter-selected'))state.sceneMode==='rank'?leaveRank():enterRank();else if(action.dataset.inspectorLayer)selectLayer(Number(action.dataset.inspectorLayer));else if(action.dataset.inspectorNode)selectNode(action.dataset.inspectorNode);
     }
-    function pointerDown(event){if(event.button!==0)return;pointer={id:event.pointerId,x:event.clientX,y:event.clientY,rx:state.camera.rx,ry:state.camera.ry,moved:false};renderer.domElement.setPointerCapture?.(event.pointerId);viewport.classList.add('is-grabbing');}
+    function pointerDown(event){if(event.button!==0)return;const pan=event.metaKey||event.ctrlKey;camera.updateMatrixWorld();const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0).normalize(),up=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1).normalize(),targetVector=new THREE.Vector3(state.camera.target.x,state.camera.target.y,state.camera.target.z),distance=camera.position.distanceTo(targetVector),worldPerPixel=2*Math.tan(THREE.MathUtils.degToRad(camera.fov*.5))*distance/(Math.max(1,viewport.clientHeight)*camera.zoom);pointer={id:event.pointerId,x:event.clientX,y:event.clientY,rx:state.camera.rx,ry:state.camera.ry,target:{...state.camera.target},right,up,worldPerPixel,pan,moved:false};renderer.domElement.setPointerCapture?.(event.pointerId);viewport.classList.add('is-grabbing');}
     function pointerMove(event){
-      if(pointer&&event.pointerId===pointer.id){const dx=event.clientX-pointer.x,dy=event.clientY-pointer.y;pointer.moved=pointer.moved||Math.hypot(dx,dy)>3;state.camera.ry=pointer.ry-dx*.2;state.camera.rx=pointer.rx-dy*.18;setCamera();return;}
+      if(pointer&&event.pointerId===pointer.id){const dx=event.clientX-pointer.x,dy=event.clientY-pointer.y;pointer.moved=pointer.moved||Math.hypot(dx,dy)>3;if(pointer.pan){const scale=pointer.worldPerPixel;state.camera.target={x:pointer.target.x-pointer.right.x*dx*scale+pointer.up.x*dy*scale,y:pointer.target.y-pointer.right.y*dx*scale+pointer.up.y*dy*scale,z:pointer.target.z-pointer.right.z*dx*scale+pointer.up.z*dy*scale};}else{state.camera.ry=pointer.ry-dx*.2;state.camera.rx=pointer.rx-dy*.18;}setCamera();return;}
       if(hoverRaf)return;hoverRaf=requestAnimationFrame(()=>{hoverRaf=0;const manifest=pickRank(event);state.hoveredRank=manifest?.rank??null;if(!manifest){tooltip.classList.remove('is-visible');return;}const [segment]=manifest.layerSegments,e=manifest.expertOwnership,c=manifest.coordinate;tooltip.innerHTML=`<b>Rank ${manifest.rank}</b><span>PP${c.pp} · TP${c.tp} · EP${c.ep} · EDP${c.edp}</span><small>L${segment.start}–L${segment.end} · E${e.start}–E${e.end}</small>`;const rect=viewport.getBoundingClientRect();tooltip.style.left=`${event.clientX-rect.left+14}px`;tooltip.style.top=`${event.clientY-rect.top+14}px`;tooltip.classList.add('is-visible');});
     }
     function pointerUp(event){if(!pointer||event.pointerId!==pointer.id)return;const moved=pointer.moved;pointer=null;viewport.classList.remove('is-grabbing');try{renderer.domElement.releasePointerCapture?.(event.pointerId);}catch(_){}if(moved)return;const node=pickNode(event);if(node){state.selectedNode=node;state.selectedLayer=node.layer;updateSelection();updateOperatorLabels();renderInspector();requestRender();return;}const manifest=pickRank(event);if(manifest){selectRank(manifest.rank);return;}clearRankSelection();}
@@ -549,9 +608,9 @@
     function keydown(event){if(event.key!=='Escape')return;if(state.selectedNode){state.selectedNode=null;sync();}else if(state.sceneMode==='rank')leaveRank();else if(selectedGroup()){state.selectedGroup=null;state.selectedRank=null;state.selectedLayer=null;sync({layout:true});}else if(state.selectedRank!==null){state.selectedRank=null;state.selectedLayer=null;sync({layout:true});}}
 
     function disposeObject(object){object.geometry?.dispose?.();if(Array.isArray(object.material))object.material.forEach(material=>material.dispose?.());else object.material?.dispose?.();}
-    function destroy(){destroyed=true;cancelAnimationFrame(renderRaf);cancelAnimationFrame(layoutTweenRaf);cancelAnimationFrame(hoverRaf);resizeObserver?.disconnect();root.removeEventListener('click',rootClick);viewport.removeEventListener('keydown',keydown);renderer.domElement.removeEventListener('pointerdown',pointerDown);renderer.domElement.removeEventListener('pointermove',pointerMove);renderer.domElement.removeEventListener('pointerup',pointerUp);renderer.domElement.removeEventListener('pointercancel',pointerUp);renderer.domElement.removeEventListener('dblclick',doubleClick);renderer.domElement.removeEventListener('wheel',wheel);clearOperatorLabels();operatorLabelTextures.forEach(asset=>asset.texture.dispose());operatorLabelGeometry.dispose();scene.traverse(disposeObject);renderer.dispose();renderer.domElement.remove();}
+    function destroy(){destroyed=true;cancelAnimationFrame(renderRaf);cancelAnimationFrame(layoutTweenRaf);cancelAnimationFrame(hoverRaf);resizeObserver?.disconnect();root.removeEventListener('click',rootClick);viewport.removeEventListener('keydown',keydown);renderer.domElement.removeEventListener('pointerdown',pointerDown);renderer.domElement.removeEventListener('pointermove',pointerMove);renderer.domElement.removeEventListener('pointerup',pointerUp);renderer.domElement.removeEventListener('pointercancel',pointerUp);renderer.domElement.removeEventListener('dblclick',doubleClick);renderer.domElement.removeEventListener('wheel',wheel);clearOperatorLabels();operatorLabelTextures.forEach(asset=>asset.texture.dispose());operatorLabelGeometry.dispose();trafficTexture.dispose();scene.traverse(disposeObject);renderer.dispose();renderer.domElement.remove();}
     const ready=Promise.resolve();
-    const api={root,state,spec,get plan(){return plan;},sceneIndex,integrity,renderer,scene,camera,ready,setSceneMode,setTopologyMode,setGroupingAxes,resetGrouping,setTheme,setPose,fit,selectRank,enterRank,leaveRank,selectLayer,selectNode,selectExpert,selectGroup,getRankManifest(rank){return plan.manifestByRank.get(Number(rank))||null;},getState(){return copy(state);},getSceneStats(){return{rankVolumes:plan.stats.rankVolumes,layerInstances:plan.stats.layerInstances,staticInstances:plan.stats.staticInstances,nodeInstances:sceneIndex.nodes.size,edgeInstances:sceneIndex.edges.size,clusterInstances:clusterMetas.length,nodeBatches:nodeBatches.size,edgeBatches:edgeBatches.size,drawBatches:2+nodeBatches.size+edgeBatches.size+4+parallelFrameGroup.children.length,integrity:copy(integrity),renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles}};},refresh(){resize();updateColors();return api;},destroy};
+    const api={root,state,spec,get plan(){return plan;},sceneIndex,integrity,renderer,scene,camera,ready,setSceneMode,setTopologyMode,setGroupingAxes,resetGrouping,setTheme,setPose,fit,selectRank,enterRank,leaveRank,selectLayer,selectNode,selectExpert,selectGroup,focusCommunicationGroup,focusRankSet,clearCommunicationGroup,setFloorTrafficData,focusFloorTrafficEventIds,clearFloorTrafficFocus(){return focusFloorTrafficEventIds([]);},getRankManifest(rank){return plan.manifestByRank.get(Number(rank))||null;},getState(){return copy(state);},getSceneStats(){return{rankVolumes:plan.stats.rankVolumes,layerInstances:plan.stats.layerInstances,staticInstances:plan.stats.staticInstances,nodeInstances:sceneIndex.nodes.size,edgeInstances:sceneIndex.edges.size,clusterInstances:clusterMetas.length,nodeBatches:nodeBatches.size,edgeBatches:edgeBatches.size,drawBatches:2+nodeBatches.size+edgeBatches.size+5+parallelFrameGroup.children.length,integrity:copy(integrity),renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles}};},refresh(){resize();updateColors();updateTrafficFloor();return api;},destroy};
 
     root.addEventListener('click',rootClick);viewport.addEventListener('keydown',keydown);renderer.domElement.addEventListener('pointerdown',pointerDown);renderer.domElement.addEventListener('pointermove',pointerMove);renderer.domElement.addEventListener('pointerup',pointerUp);renderer.domElement.addEventListener('pointercancel',pointerUp);renderer.domElement.addEventListener('dblclick',doubleClick);renderer.domElement.addEventListener('wheel',wheel,{passive:false});
     const resizeObserver=global.ResizeObserver?new ResizeObserver(resize):null;resizeObserver?.observe(viewport);
@@ -560,6 +619,6 @@
 
   global.PtoModelParallelRankDeck={
     DEFAULT_TOPOLOGY,ISOMETRIC_POSE,normalizeTopology,enumerateRanks,partitionModel,layoutPosition,
-    normalizeGroupingAxes,toggleGroupingAxis,buildHierarchicalRankLayout,sampleSvgPath,parseTemplate,buildModelSceneSpec,render:mount,mount
+    normalizeGroupingAxes,toggleGroupingAxis,buildHierarchicalRankLayout,payloadPoint,sampleSvgPath,parseTemplate,buildModelSceneSpec,render:mount,mount
   };
 })(window);

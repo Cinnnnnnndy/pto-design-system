@@ -15,7 +15,7 @@ design-system-share/
 ├── README.md                    ← 当前文件，给你看的使用说明
 ├── SKILL.md                     ← 给 AI 看的规则（让 AI 先读这个）
 ├── DESIGN.md                    ← 设计系统全景说明（颜色 / 字体 / 间距 / 组件 / 治理）
-├── design-system-preview.html   ← 基础组件辅助预览；完整页面优先看 patterns
+├── design-system-preview.html   ← 基础组件辅助预览（样式与交互在 preview/）；完整页面优先看 patterns
 ├── references/
 │   ├── quick-reference.md       ← 一页速查：所有 token 和 class 名
 │   ├── pto-design-system-map.md ← 元素分类规则（什么时候用什么按钮）
@@ -29,6 +29,7 @@ design-system-share/
 │   ├── tokens.json              ← 生成产物，不手改
 │   └── tokens.js                ← 生成产物，不手改
 ├── css/style.css                ← 真正的 class 实现
+├── preview/                     ← preview 页脚手架：preview.css / preview.js（design-system-preview.html 的独立样式与交互，preview-only，业务页不要引用）
 ├── scripts/audit-theme.mjs      ← light/dark token、硬编码颜色、对比度检查
 ├── scripts/audit-typography.mjs ← 14px 正文基线、token 完整性、data-viz 小字号例外检查
 ├── assets/                      ← pattern 运行时需要的 SVG 资源（例如 fx.svg）
@@ -39,10 +40,19 @@ design-system-share/
     ├── workbench-shell/         ← 可拖拽分屏 resize kernel，只负责 split / gutter / localStorage
     ├── floating-playback-control/ ← 悬浮播放、step、scrubber 控制条
     ├── model-graphviz/          ← TorchVista / DeepSeek V3.2 Graphviz / Qwen-7B / openPangu-2.0-Flash model architecture / report overlay
+    ├── model-architecture-3d-deck/ ← openPangu 深度堆叠模型架构与平行标注
+    ├── model-parallel-rank-deck/ ← Three.js 模型到 Rank 的并行放置
+    ├── model-architecture-training-sidecar/ ← 模型架构训练语义与 telemetry sidecar
+    ├── training-metrics-chart/  ← 训练指标、异常、brush 和 step cursor SVG 图表
     ├── memory-architecture/     ← 910B / 950 内存架构图与 route overlay
+    ├── memory-reuse-viewer/     ← UB / L1 / L0C tensor lifetime 与复用检查器
+    ├── hardware-architecture-viewport/ ← 硬件架构 viewport、toolbar、zoom 和消息协议
     ├── aic-core-object/         ← AIC core object 可配置结构图
     ├── aiv-core-object/         ← AIV core object 可配置结构图
     ├── pass-ir-graph-node/      ← Pass-IR graph node 卡片和 compact/group 状态
+    ├── tensor-volume-canvas/    ← API Visualizer 风格的固定视角三维 Tensor Canvas renderer
+    ├── matrix-canvas/           ← 二维矩阵 Tensor Canvas，支持逐元素格与大矩阵聚合格
+    ├── tensor-title/            ← Tensor / Matrix / Volume 上方的共享标题条：shape、format、memory、tiling、state 与溯源
     └── swimlane-task/           ← 执行 trace / timeline 泳道任务条 canvas renderer
 ```
 
@@ -56,9 +66,18 @@ design-system-share/
 | `workbench-shell` | 任意需要拖拽调整大小的分屏 | `patterns/workbench-shell/pattern.js` |
 | `floating-playback-control` | step、播放、暂停、scrubber、回放控制 | `patterns/floating-playback-control/pattern.js` |
 | `model-graphviz` | TorchVista / 模型 Graphviz / Qwen-7B / openPangu-2.0-Flash 架构页 / 报告 overlay | `patterns/model-graphviz/pattern.html` |
+| `model-architecture-3d-deck` | openPangu 深度堆叠架构、iso/front/right 视图和平行标注 | `patterns/model-architecture-3d-deck/pattern.js` |
+| `model-parallel-rank-deck` | 将完整模型 Layer 编译到 Three.js Rank volumes；支持全局网格、通信组聚焦与并行归属检查 | `patterns/model-parallel-rank-deck/pattern.js` |
+| `model-architecture-training-sidecar` | 在 3D deck 右视图上增加训练流、梯度、loss、metric 与 Layer 下钻 | `patterns/model-architecture-training-sidecar/pattern.js` |
+| `training-metrics-chart` | 训练指标曲线、异常点、interest-window brush 和 step cursor | `patterns/training-metrics-chart/pattern.js` |
 | `memory-architecture` | 910B / 950 内存层级、MTE route、AIC/AIV 组合图、graph-only iframe、60% 默认缩放、拖拽和 Command-wheel 缩放 | `patterns/memory-architecture/pattern.js` |
+| `memory-reuse-viewer` | UB / L1 / L0C tensor lifetime、buffer offset、peak usage 与复用关系检查 | `patterns/memory-reuse-viewer/pattern.js` |
+| `hardware-architecture-viewport` | 架构图 toolbar、detail visibility、zoom readout、iframe readiness 和标准消息协议 | `patterns/hardware-architecture-viewport/pattern.js` |
 | `aic-core-object` / `aiv-core-object` | 单独渲染 AIC / AIV 内部结构 | `patterns/aic-core-object/pattern.js` / `patterns/aiv-core-object/pattern.js` |
 | `pass-ir-graph-node` | Pass-IR 节点卡、group node、compact node | `patterns/pass-ir-graph-node/pattern.js` |
+| `tensor-volume-canvas` | NCHW / A1 / Load3D / Conv / Tiling / Code Recovery 的固定视角三维 Tensor 体素渲染 | `patterns/tensor-volume-canvas/pattern.js` |
+| `matrix-canvas` | 二维矩阵 Tensor、Load3D A2 状态、大矩阵聚合格，以及多 Tensor 共享语义轴比例尺 | `patterns/matrix-canvas/pattern.js` |
+| `tensor-title` | Tensor / Matrix / Volume 上方的共享标题条，统一身份、shape、dtype、format、memory、owner、partition、state、provenance、step、axes 与约束 | `patterns/tensor-title/pattern.js` |
 | `swimlane-task` | 执行 trace / timeline 的泳道任务条 | `patterns/swimlane-task/pattern.js` |
 
 ## 在三种环境里加载
@@ -163,8 +182,17 @@ AI 应该先问清楚：
 | 可拖拽分屏 | `patterns/workbench-shell` |
 | 执行 trace / 时间线任务条 | `patterns/swimlane-task` |
 | Pass-IR graph 节点卡 | `patterns/pass-ir-graph-node` |
+| 固定视角三维 Tensor / Load3D 体素状态 | `patterns/tensor-volume-canvas`；页面将业务状态转换为 voxel 数据并直接调用共享 renderer |
+| 二维矩阵 Tensor / 大矩阵缩略概览 | `patterns/matrix-canvas`；页面保持源 shape，通过任意 span + summary 或目标缩略格行列数表达聚合区域 |
+| Tensor / Matrix / Volume 上方的标题与元数据条 | `patterns/tensor-title`；页面把逻辑 shape、物理 layout、memory、tiling、state、provenance 和 step 作为结构化字段传入 |
 | TorchVista / 模型 Graphviz / Qwen-7B / openPangu-2.0-Flash 架构页 / 报告 overlay | `patterns/model-graphviz` |
+| 深度堆叠模型架构与平行标注 | `patterns/model-architecture-3d-deck` |
+| 模型到 Rank 的 Three.js 并行放置 | `patterns/model-parallel-rank-deck` |
+| 模型架构训练流、梯度、loss 与 Layer telemetry | `patterns/model-architecture-training-sidecar` |
+| 训练指标曲线、异常与 step cursor | `patterns/training-metrics-chart` |
 | AIC / AIV / 950B 内存架构图 | `patterns/memory-architecture`、`patterns/aic-core-object`、`patterns/aiv-core-object`；iframe/inspector 嵌入默认 graph-only，使用 `createZoomController` 的 60% zoom、拖拽和 Command-wheel 缩放 |
+| 硬件架构 viewport toolbar、zoom 和消息同步 | `patterns/hardware-architecture-viewport` |
+| UB / L1 / L0C tensor lifetime 与复用检查 | `patterns/memory-reuse-viewer` |
 | 底部播放和 step 控制 | `patterns/floating-playback-control` |
 
 如果一个 pattern 已经有完整运行环境，比如 Graphviz overlay 原页面仍然负责 DOT 生成、D3 zoom、popup、展开折叠，那么 pattern 预览可以用 iframe 保持一致；如果是在新页面里消费同一套视觉和渲染逻辑，则直接加载对应 `pattern.css` / `pattern.js` 并调用 `window.Pto*Pattern` 或 `window.Pto*` API。
@@ -202,7 +230,7 @@ AI 应该先问清楚：
 在指令里**强调一次**：「请先读 `SKILL.md`，并按里面的 Workflow A/B/C 输出」。大多数情况这一句就够了。
 
 **Q：我自己改了 PTO 主仓库的 token，这个文件夹会自动同步吗？**
-不会，这是一份**复制**。主仓库改动后需要把 `DESIGN.md` / `design-system-preview.html` / `tokens/*` / `css/style.css` / `swimlane/styles.css` / `patterns/` 重新复制进来。
+不会，这是一份**复制**。主仓库改动后需要把 `references/DESIGN.md` / `design-system-preview.html` / `preview/` / `tokens/*` / `css/style.css` / `swimlane/styles.css` / `patterns/` 重新复制进来。
 
 **Q：可以把 AI 生成的新组件回流到 PTO 系统里吗？**
 可以而且应该。流程是：AI 先做 preview → 你审核 → 审核通过后**先把样式塞进 `tokens/` 和 `css/style.css`**，**再**让业务模块去消费。绝对不要先在业务模块里用、回头再补到系统里。
