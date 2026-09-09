@@ -1045,19 +1045,22 @@
     return `M ${start.x} ${start.y} C ${midX} ${start.y}, ${midX} ${end.y}, ${end.x} ${end.y}`;
   }
 
-  function drawMarker(defs, markerId) {
+  function drawMarker(defs, markerId, requestedSize) {
+    const parsedSize = Number(requestedSize);
+    const markerSize = Number.isFinite(parsedSize) ? Math.max(4, Math.min(10, parsedSize)) : 8;
     const marker = createSvgElement('marker', {
       id: markerId,
       viewBox: '0 0 10 10',
       refX: '8.6',
       refY: '5',
-      markerWidth: '8',
-      markerHeight: '8',
+      markerWidth: String(markerSize),
+      markerHeight: String(markerSize),
+      markerUnits: 'userSpaceOnUse',
       orient: 'auto-start-reverse',
     });
     marker.appendChild(createSvgElement('path', {
       d: 'M 0 0 L 10 5 L 0 10 z',
-      fill: LINE_COLOR,
+      fill: 'context-stroke',
     }));
     defs.appendChild(marker);
   }
@@ -1370,9 +1373,11 @@
     });
     group.appendChild(rect);
 
+    const rightReserved = node.collapsed ? EXPAND_BUTTON_EDGE_GAP + EXPAND_BUTTON_RADIUS * 2 : 0;
+    const contentX = -rightReserved / 2;
     const label = createSvgElement('text', {
       class: 'pto-model-graphviz-node-label',
-      x: node.collapsed ? -8 : 0,
+      x: contentX,
       y: visualKind === 'tensor' || visualKind === 'op' || node.hideTypeLabel || node.glyph ? 0 : -4,
       fill: NODE_TEXT_COLOR,
     });
@@ -1382,7 +1387,7 @@
     if (visualKind !== 'tensor' && visualKind !== 'op' && !node.hideTypeLabel && !node.glyph) {
       const type = createSvgElement('text', {
         class: 'pto-model-graphviz-node-type',
-        x: node.collapsed ? -8 : 0,
+        x: contentX,
         y: 12,
         fill: NODE_TYPE_COLOR,
       });
@@ -2147,7 +2152,7 @@
       viewBox: `0 0 ${width} ${height}`,
     });
     const defs = createSvgElement('defs');
-    drawMarker(defs, markerId);
+    drawMarker(defs, markerId, resolvedOptions.edgeMarkerSize);
     svg.appendChild(defs);
 
     const colorMapOptions = resolvedColormapOptions(resolvedOptions);

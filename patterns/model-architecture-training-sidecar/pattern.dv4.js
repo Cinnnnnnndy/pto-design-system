@@ -38,6 +38,7 @@
       y,
       width: options.width || 260,
       height: options.height || 56,
+      hideTypeLabel: options.hideTypeLabel === true,
       parent: options.parent || '',
       selectable: false,
       collapsed: options.collapsed === true,
@@ -131,6 +132,57 @@
       ffnMerge: `${ffnId}/merge`,
       output: `${rootId}/output_streams`
     };
+    const canonicalCsa = global.PtoCsaMappingRegistry?.canonicalGraph || null;
+    const csaProjection = canonicalCsa?.l1Projection || null;
+    const csaOrigin = { x: 315, y: 570 };
+    const csaNodeId = canonicalId => canonicalId;
+    const csaSemanticNodes = (canonicalCsa?.compoundIds || []).map(canonicalId => {
+      const presentation = csaProjection.nodes[canonicalId];
+      const semanticNode = global.PtoCsaMappingRegistry?.getNode(canonicalId);
+      const projected = graphNode(
+        csaNodeId(canonicalId),
+        semanticNode.label,
+        csaOrigin.x + presentation.x,
+        csaOrigin.y + presentation.y,
+        {
+          parent: csaId,
+          kind: 'module',
+          hideTypeLabel: true,
+          colorKey: presentation.colorKey,
+          width: presentation.width,
+          height: presentation.height,
+          variant: 'csa'
+        }
+      );
+      projected.canonicalId = canonicalId;
+      projected.sourceRefs = semanticNode?.sourceRefs || [];
+      return projected;
+    });
+    const csaUnavailableId = `${csaId}/registry_unavailable`;
+    if (!canonicalCsa) {
+      csaSemanticNodes.push(graphNode(csaUnavailableId, 'CSA canonical registry unavailable', 697, 835, {
+        parent: csaId, kind: 'module', typeLabel: 'Unavailable', colorKey: 'module:mhc', width: 340, variant: 'csa'
+      }));
+    }
+    const csaSummaryEdges = canonicalCsa?.summaryEdges || [];
+    const resolveCsaEndpoint = id => {
+      if (id === 'csa_scope_input') return ids.attentionType;
+      if (id === 'csa_scope_output') return ids.attnPost;
+      return csaNodeId(id);
+    };
+    const csaProjectedEdges = csaSummaryEdges.map((edge, index) => graphEdge(
+      `edge/csa-canonical-${index}`,
+      resolveCsaEndpoint(edge.source),
+      resolveCsaEndpoint(edge.target),
+      edge.label,
+      { variant: 'csa' }
+    ));
+    if (!canonicalCsa) {
+      csaProjectedEdges.push(
+        graphEdge('edge/csa-registry-input', ids.attentionType, csaUnavailableId, 'CSA input', { variant: 'csa' }),
+        graphEdge('edge/csa-registry-output', csaUnavailableId, ids.attnPost, 'CSA output', { variant: 'csa' })
+      );
+    }
 
     const clusters = [
       graphCluster(rootId, `DeepSeek V4 Decoder Layer · L${layer}`, 60, 70, 1720, 2310, {
@@ -140,16 +192,24 @@
         parent: rootId,
         colorKey: 'module:mhc'
       }),
-      graphCluster(hybridId, 'Hybrid Attention · CSA / HCA', 375, 535, 1280, 555, {
+      graphCluster(hybridId, 'Hybrid Attention · CSA / HCA', 285, 535, 1440, 625, {
         parent: attnId,
         colorKey: 'module:mhc'
       }),
-      graphCluster(csaId, 'CSA · Compressed Sparse Attention', 405, 595, 585, 455, {
-        parent: hybridId,
-        colorKey: 'opv:attention',
-        variant: 'csa'
-      }),
-      graphCluster(hcaId, 'HCA · Heavily Compressed Attention', 1035, 595, 585, 455, {
+      graphCluster(
+        csaId,
+        csaProjection?.label || 'CSA · Compressed Sparse Attention',
+        csaOrigin.x,
+        csaOrigin.y,
+        csaProjection?.width || 585,
+        csaProjection?.height || 455,
+        {
+          parent: hybridId,
+          colorKey: 'opv:attention',
+          variant: 'csa'
+        }
+      ),
+      graphCluster(hcaId, 'HCA · Heavily Compressed Attention', 1085, 570, 620, 550, {
         parent: hybridId,
         colorKey: 'opv:rope',
         variant: 'hca'
@@ -185,44 +245,24 @@
         typeLabel: `L${layer} architecture schedule`, colorKey: descriptor.attentionType === 'csa' ? 'sem:attention' : 'sem:rope', width: FRONT_MAIN_NODE_WIDTH, height: 64
       }),
 
-      graphNode(`${csaId}/query_projection`, 'Query Projection', 697, 655, {
-        parent: csaId, colorKey: 'sem:linear', width: 270, variant: 'csa'
-      }),
-      graphNode(`${csaId}/kv_compressor`, 'KV Compressor ×4', 697, 735, {
-        parent: csaId, colorKey: 'sem:attention', width: 270, variant: 'csa'
-      }),
-      graphNode(`${csaId}/compressed_kv`, 'Compressed KV', 500, 835, {
-        parent: csaId, kind: 'state', typeLabel: 'KV State', colorKey: 'io:state', width: 170, variant: 'csa'
-      }),
-      graphNode(`${csaId}/lightning_indexer`, 'Lightning Indexer', 697, 835, {
-        parent: csaId, colorKey: 'sem:attention', width: 190, variant: 'csa'
-      }),
-      graphNode(`${csaId}/swa_kv`, `SWA KV · ${config.slidingWindow}`, 895, 835, {
-        parent: csaId, kind: 'state', typeLabel: 'Local KV State', colorKey: 'io:state', width: 170, variant: 'csa'
-      }),
-      graphNode(`${csaId}/shared_kv_mqa`, 'Shared-KV MQA', 697, 930, {
-        parent: csaId, colorKey: 'sem:attention', width: 280, variant: 'csa'
-      }),
-      graphNode(`${csaId}/grouped_o_projection`, 'Grouped Output Projection', 697, 1015, {
-        parent: csaId, colorKey: 'sem:linear', width: 300, variant: 'csa'
-      }),
+      ...csaSemanticNodes,
 
-      graphNode(`${hcaId}/query_projection`, 'Query Projection', 1328, 655, {
+      graphNode(`${hcaId}/query_projection`, 'Query Projection', 1395, 655, {
         parent: hcaId, colorKey: 'sem:linear', width: 270, variant: 'hca'
       }),
-      graphNode(`${hcaId}/kv_compressor`, 'KV Compressor ×128', 1328, 735, {
+      graphNode(`${hcaId}/kv_compressor`, 'KV Compressor ×128', 1395, 735, {
         parent: hcaId, colorKey: 'sem:rope', width: 270, variant: 'hca'
       }),
-      graphNode(`${hcaId}/compressed_kv`, 'Compressed KV', 1198, 835, {
+      graphNode(`${hcaId}/compressed_kv`, 'Compressed KV', 1265, 835, {
         parent: hcaId, kind: 'state', typeLabel: 'KV State', colorKey: 'io:state', width: 190, variant: 'hca'
       }),
-      graphNode(`${hcaId}/swa_kv`, `SWA KV · ${config.slidingWindow}`, 1458, 835, {
+      graphNode(`${hcaId}/swa_kv`, `SWA KV · ${config.slidingWindow}`, 1525, 835, {
         parent: hcaId, kind: 'state', typeLabel: 'Local KV State', colorKey: 'io:state', width: 190, variant: 'hca'
       }),
-      graphNode(`${hcaId}/dense_mqa`, 'Dense Shared-KV MQA', 1328, 930, {
+      graphNode(`${hcaId}/dense_mqa`, 'Dense Shared-KV MQA', 1395, 930, {
         parent: hcaId, colorKey: 'sem:attention', width: 290, variant: 'hca'
       }),
-      graphNode(`${hcaId}/grouped_o_projection`, 'Grouped Output Projection', 1328, 1015, {
+      graphNode(`${hcaId}/grouped_o_projection`, 'Grouped Output Projection', 1395, 1015, {
         parent: hcaId, colorKey: 'sem:linear', width: 300, variant: 'hca'
       }),
 
@@ -323,15 +363,7 @@
       graphEdge('edge/attn-pre-norm', ids.attnPre, ids.norm1, 'collapsed_hidden', { shape: '[B,T,d]' }),
       graphEdge('edge/norm-attention-type', ids.norm1, ids.attentionType, 'normalized_hidden', { shape: '[B,T,d]' }),
 
-      graphEdge('edge/type-csa-query', ids.attentionType, `${csaId}/query_projection`, 'attention_input', { variant: 'csa' }),
-      graphEdge('edge/csa-query-compressor', `${csaId}/query_projection`, `${csaId}/kv_compressor`, 'query_and_kv_input', { variant: 'csa' }),
-      graphEdge('edge/csa-compressor-kv', `${csaId}/kv_compressor`, `${csaId}/compressed_kv`, 'compressed_kv', { variant: 'csa' }),
-      graphEdge('edge/csa-compressor-indexer', `${csaId}/kv_compressor`, `${csaId}/lightning_indexer`, 'compressed_index_kv', { variant: 'csa' }),
-      graphEdge('edge/csa-compressor-swa', `${csaId}/kv_compressor`, `${csaId}/swa_kv`, 'local_kv', { variant: 'csa' }),
-      graphEdge('edge/csa-kv-mqa', `${csaId}/compressed_kv`, `${csaId}/shared_kv_mqa`, 'selected_compressed_kv', { variant: 'csa' }),
-      graphEdge('edge/csa-indexer-mqa', `${csaId}/lightning_indexer`, `${csaId}/shared_kv_mqa`, 'topk_indices', { variant: 'csa' }),
-      graphEdge('edge/csa-swa-mqa', `${csaId}/swa_kv`, `${csaId}/shared_kv_mqa`, 'swa_kv', { variant: 'csa' }),
-      graphEdge('edge/csa-mqa-output', `${csaId}/shared_kv_mqa`, `${csaId}/grouped_o_projection`, 'mqa_output', { variant: 'csa' }),
+      ...csaProjectedEdges,
 
       graphEdge('edge/type-hca-query', ids.attentionType, `${hcaId}/query_projection`, 'attention_input', { variant: 'hca' }),
       graphEdge('edge/hca-query-compressor', `${hcaId}/query_projection`, `${hcaId}/kv_compressor`, 'query_and_kv_input', { variant: 'hca' }),
@@ -341,7 +373,6 @@
       graphEdge('edge/hca-swa-mqa', `${hcaId}/swa_kv`, `${hcaId}/dense_mqa`, 'swa_kv', { variant: 'hca' }),
       graphEdge('edge/hca-mqa-output', `${hcaId}/dense_mqa`, `${hcaId}/grouped_o_projection`, 'mqa_output', { variant: 'hca' }),
 
-      graphEdge('edge/csa-output-post', `${csaId}/grouped_o_projection`, ids.attnPost, 'attention_output', { variant: 'csa' }),
       graphEdge('edge/hca-output-post', `${hcaId}/grouped_o_projection`, ids.attnPost, 'attention_output', { variant: 'hca' }),
       graphEdge('edge/attn-post-merge', ids.attnPost, ids.attnMerge, 'hc_contribution', {
         shape: '[B,T,4,d]', bundlePath: [{ x: STREAM_X, y: 1192 }, { x: STREAM_X, y: 1224 }]
@@ -1187,10 +1218,12 @@
     tokenEdges.forEach(edge => edge.classList.toggle('is-router-input-inactive', !hashMode));
   }
 
-  function shell(config) {
-    const options = Array.from({ length: config.numHiddenLayers }, (_, layer) => (
+  function shell(config, options = {}) {
+    const layerOptions = Array.from({ length: config.numHiddenLayers }, (_, layer) => (
       `<option value="${layer}">Layer ${layer}</option>`
     )).join('');
+    const edgeStyleControl = options.showEdgeStyleControl === false ? '' : `
+          <button class="pto-dv4-architecture__button is-edge-style is-active" type="button" data-dv4-edge-style aria-label="切换为贝塞尔曲线连线" aria-pressed="true">连线 · 圆角直角</button>`;
     return `<div class="pto-dv4-architecture__workspace">
       <div class="pto-dv4-architecture__viewport" tabindex="0" aria-label="可缩放拖动的 DeepSeek V4 正视图">
         <div class="pto-dv4-architecture__canvas"></div>
@@ -1201,13 +1234,13 @@
           </div>
           <div class="pto-dv4-architecture__layer-controls">
             <button class="pto-dv4-architecture__button is-icon" type="button" data-dv4-layer-step="-1" aria-label="上一层">‹</button>
-            <select class="pto-dv4-architecture__layer-select" id="dv4LayerSelect" data-dv4-layer aria-label="Decoder Layer">${options}</select>
+            <select class="pto-dv4-architecture__layer-select" id="dv4LayerSelect" data-dv4-layer aria-label="Decoder Layer">${layerOptions}</select>
             <button class="pto-dv4-architecture__button is-icon" type="button" data-dv4-layer-step="1" aria-label="下一层">›</button>
           </div>
         </div>
         <div class="pto-dv4-architecture__viewport-actions" data-dv4-overlay>
           <button class="pto-dv4-architecture__button is-icon" type="button" data-dv4-theme aria-label="切换主题">◐</button>
-          <button class="pto-dv4-architecture__button is-edge-style is-active" type="button" data-dv4-edge-style aria-label="切换为贝塞尔曲线连线" aria-pressed="true">连线 · 圆角直角</button>
+          ${edgeStyleControl}
           <button class="pto-dv4-architecture__button" type="button" data-dv4-fit>适配</button>
           <span class="pto-dv4-architecture__readout" data-dv4-readout>100%</span>
         </div>
@@ -1225,7 +1258,7 @@
     if (!root || !data) return null;
     root.classList.add('pto-dv4-architecture', 'pto-model-graphviz-pattern-page');
     root.dataset.sharedPattern = 'model-architecture-training-sidecar-dv4-working-copy';
-    root.innerHTML = shell(data.config);
+    root.innerHTML = shell(data.config, options);
 
     const viewport = root.querySelector('.pto-dv4-architecture__viewport');
     const canvas = root.querySelector('.pto-dv4-architecture__canvas');
@@ -1275,10 +1308,12 @@
       });
       const edgeStyleButton = root.querySelector('[data-dv4-edge-style]');
       const orthogonal = state.edgeStyle === 'orthogonal';
-      edgeStyleButton.textContent = orthogonal ? '连线 · 圆角直角' : '连线 · 曲线';
-      edgeStyleButton.setAttribute('aria-label', orthogonal ? '切换为贝塞尔曲线连线' : '切换为圆角直角连线');
-      edgeStyleButton.setAttribute('aria-pressed', String(orthogonal));
-      edgeStyleButton.classList.toggle('is-active', orthogonal);
+      if (edgeStyleButton) {
+        edgeStyleButton.textContent = orthogonal ? '连线 · 圆角直角' : '连线 · 曲线';
+        edgeStyleButton.setAttribute('aria-label', orthogonal ? '切换为贝塞尔曲线连线' : '切换为圆角直角连线');
+        edgeStyleButton.setAttribute('aria-pressed', String(orthogonal));
+        edgeStyleButton.classList.toggle('is-active', orthogonal);
+      }
     }
 
     function renderScene(shouldFit = true) {
@@ -1312,6 +1347,7 @@
         selectableClusters: false,
         autoFit: false,
         edgeRouting: state.edgeStyle,
+        edgeMarkerSize: 6,
         edgeCornerRadius: 12,
         initialTransform: { tx: 0, ty: 0, zoom: 1 },
         onToggle({ nodeId, collapsed }) {
@@ -1427,7 +1463,7 @@
     root.querySelectorAll('[data-dv4-view]').forEach(button => {
       button.addEventListener('click', () => setView(button.dataset.dv4View));
     });
-    root.querySelector('[data-dv4-edge-style]').addEventListener('click', () => {
+    root.querySelector('[data-dv4-edge-style]')?.addEventListener('click', () => {
       setEdgeStyle(state.edgeStyle === 'bezier' ? 'orthogonal' : 'bezier');
     });
     root.querySelector('[data-dv4-fit]').addEventListener('click', fit);
@@ -1472,6 +1508,16 @@
   global.PtoDv4ArchitecturePattern = Object.freeze({
     render,
     buildFrontGraph,
-    buildSideGraph
+    buildSideGraph,
+    // Reuse the same folding and visual decorations when an adapter supplies
+    // additional source-backed descendants; existing previews are unchanged.
+    projectCollapsedFrontGraph,
+    decorateFrontGraph(host, graph, edgeStyle = 'orthogonal') {
+      decorateRoleClasses(host, graph);
+      decorateHashInput(host, graph);
+      decorateFanCurves(host, graph, edgeStyle);
+      decorateMhcBundles(host, graph);
+      (graph.metadata?.mergeNodeIds || []).forEach(id => decorateMhcMerge(host, graph, id));
+    }
   });
 })(window);
