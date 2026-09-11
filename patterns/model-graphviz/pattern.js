@@ -1221,7 +1221,16 @@
     if (cluster.collapsible !== false) {
       const toggleX = cluster.x + cluster.width - EXPAND_BUTTON_EDGE_GAP - EXPAND_BUTTON_RADIUS;
       const toggleY = cluster.y + EXPAND_BUTTON_EDGE_GAP + EXPAND_BUTTON_RADIUS;
-      group.appendChild(createSvgElement('circle', {
+      const toggleControl = createSvgElement('g', {
+        class: 'pto-model-graphviz-toggle-control',
+      });
+      toggleControl.appendChild(createSvgElement('circle', {
+        class: 'pto-model-graphviz-toggle-hit',
+        cx: toggleX,
+        cy: toggleY,
+        r: EXPAND_BUTTON_RADIUS + 10,
+      }));
+      toggleControl.appendChild(createSvgElement('circle', {
         class: 'pto-model-graphviz-toggle',
         cx: toggleX,
         cy: toggleY,
@@ -1231,7 +1240,8 @@
         class: 'pto-model-graphviz-toggle-icon',
         d: `M ${toggleX - 5} ${toggleY} H ${toggleX + 5}`,
       });
-      group.appendChild(icon);
+      toggleControl.appendChild(icon);
+      group.appendChild(toggleControl);
     }
     svg.appendChild(group);
     return group;
@@ -1398,7 +1408,16 @@
     if (node.collapsed) {
       const toggleX = node.width / 2 - EXPAND_BUTTON_EDGE_GAP - EXPAND_BUTTON_RADIUS;
       const toggleY = 0;
-      group.appendChild(createSvgElement('circle', {
+      const toggleControl = createSvgElement('g', {
+        class: 'pto-model-graphviz-toggle-control',
+      });
+      toggleControl.appendChild(createSvgElement('circle', {
+        class: 'pto-model-graphviz-toggle-hit',
+        cx: toggleX,
+        cy: toggleY,
+        r: EXPAND_BUTTON_RADIUS + 10,
+      }));
+      toggleControl.appendChild(createSvgElement('circle', {
         class: 'pto-model-graphviz-toggle',
         cx: toggleX,
         cy: toggleY,
@@ -1408,7 +1427,8 @@
         class: 'pto-model-graphviz-toggle-icon',
         d: `M ${toggleX - 5} ${toggleY} H ${toggleX + 5} M ${toggleX} ${toggleY - 5} V ${toggleY + 5}`,
       });
-      group.appendChild(icon);
+      toggleControl.appendChild(icon);
+      group.appendChild(toggleControl);
     }
 
     if (options?.reportOverlays !== false) {
@@ -1838,7 +1858,7 @@
 
     nodeEntries.forEach(({ el, node }) => {
       const itemSelectable = selectable && node.selectable !== false;
-      const toggle = el.querySelector('.pto-model-graphviz-toggle');
+      const toggle = el.querySelector('.pto-model-graphviz-toggle-control');
       if (toggle && typeof opts.onToggle === 'function') {
         toggle.setAttribute('tabindex', '0');
         toggle.setAttribute('role', 'button');
@@ -1902,7 +1922,7 @@
     const selectableClusters = selectable && interaction.selectableClusters !== false && opts.selectableClusters !== false;
     clusterEntries.forEach(({ el, cluster, layerPager }) => {
       const itemSelectable = selectableClusters && cluster.selectable !== false;
-      const toggle = el.querySelector('.pto-model-graphviz-toggle');
+      const toggle = el.querySelector('.pto-model-graphviz-toggle-control');
       if (toggle && typeof opts.onToggle === 'function') {
         toggle.setAttribute('tabindex', '0');
         toggle.setAttribute('role', 'button');

@@ -47,6 +47,11 @@
       "preview": "patterns/model-graphviz/pattern.html"
     },
     {
+      "id": "model-architecture-front-view",
+      "path": "patterns/model-architecture-front-view/pattern.json",
+      "preview": "patterns/model-architecture-front-view/pattern.html"
+    },
+    {
       "id": "model-architecture-3d-deck",
       "path": "patterns/model-architecture-3d-deck/pattern.json",
       "preview": "patterns/model-architecture-3d-deck/pattern.html"

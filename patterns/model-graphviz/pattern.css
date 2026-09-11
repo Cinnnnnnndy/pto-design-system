@@ -416,10 +416,22 @@
   font-size: var(--font-size-label-sm);
 }
 
+.pto-model-graphviz-toggle-control {
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.pto-model-graphviz-toggle-hit {
+  fill: rgb(0 0 0 / 0.001);
+  stroke: none;
+  pointer-events: all;
+}
+
 .pto-model-graphviz-toggle {
   fill: var(--model-graphviz-toggle-bg);
   stroke: var(--model-graphviz-toggle-border);
   stroke-width: 0.8px;
+  pointer-events: none;
 }
 
 .pto-model-graphviz-toggle-icon {
