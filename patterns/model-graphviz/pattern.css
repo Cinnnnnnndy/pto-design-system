@@ -416,19 +416,29 @@
   font-size: var(--font-size-label-sm);
 }
 
+.pto-model-graphviz-toggle-control {
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.pto-model-graphviz-toggle-hit {
+  fill: rgb(0 0 0 / 0.001);
+  stroke: none;
+  pointer-events: all;
+}
+
 .pto-model-graphviz-toggle {
   fill: var(--model-graphviz-toggle-bg);
   stroke: var(--model-graphviz-toggle-border);
   stroke-width: 0.8px;
+  pointer-events: none;
 }
 
 .pto-model-graphviz-toggle-icon {
-  fill: var(--model-graphviz-toggle-icon);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-title-sm);
-  font-weight: var(--font-weight-bold);
-  text-anchor: middle;
-  dominant-baseline: central;
+  fill: none;
+  stroke: var(--model-graphviz-toggle-icon);
+  stroke-width: 2.2px;
+  stroke-linecap: round;
   pointer-events: none;
 }
 

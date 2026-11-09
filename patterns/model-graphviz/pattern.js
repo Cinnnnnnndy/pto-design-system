@@ -969,7 +969,7 @@
     return parts.join(' ');
   }
 
-  function edgePath(source, target, edge) {
+  function edgePath(source, target, edge, options = {}) {
     const vertical = Math.abs(source.y - target.y) >= Math.abs(source.x - target.x);
     const sourceAnchor = edge?.sourceAnchor || (vertical
       ? source.y < target.y ? 'bottom' : 'top'
@@ -977,22 +977,58 @@
     const targetAnchor = edge?.targetAnchor || (vertical
       ? source.y < target.y ? 'top' : 'bottom'
       : source.x < target.x ? 'left' : 'right');
+    const sourceSide = typeof sourceAnchor === 'string'
+      ? sourceAnchor
+      : sourceAnchor?.side || sourceAnchor?.anchor;
+    const targetSide = typeof targetAnchor === 'string'
+      ? targetAnchor
+      : targetAnchor?.side || targetAnchor?.anchor;
     const start = edge?.sourcePoint
       ? { x: Number(edge.sourcePoint.x), y: Number(edge.sourcePoint.y) }
       : nodeAnchor(source, sourceAnchor);
     const end = edge?.targetPoint
       ? { x: Number(edge.targetPoint.x), y: Number(edge.targetPoint.y) }
       : nodeAnchor(target, targetAnchor);
+    const orthogonal = options.edgeRouting === 'orthogonal';
+    const cornerRadius = Number.isFinite(Number(options.edgeCornerRadius))
+      ? Number(options.edgeCornerRadius)
+      : 12;
     if (Array.isArray(edge?.waypoints) && edge.waypoints.length) {
       const points = [
         start,
         ...edge.waypoints.map((point) => ({ x: Number(point.x), y: Number(point.y) })),
         end,
       ];
+      if (orthogonal) return roundedRoutePath(points, cornerRadius);
       if (edge.route === 'smooth' || edge.curve === 'smooth') {
         return smoothRoutePath(points, edge.tension);
       }
       return roundedRoutePath(points, edge.cornerRadius ?? 32);
+    }
+    if (orthogonal) {
+      if (start.x === end.x || start.y === end.y) {
+        return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+      }
+      const anchoredVertically = ['top', 'bottom'].includes(sourceSide)
+        && ['top', 'bottom'].includes(targetSide);
+      const anchoredHorizontally = ['left', 'right'].includes(sourceSide)
+        && ['left', 'right'].includes(targetSide);
+      if (anchoredVertically || (!anchoredHorizontally && vertical)) {
+        const midY = (start.y + end.y) / 2;
+        return roundedRoutePath([
+          start,
+          { x: start.x, y: midY },
+          { x: end.x, y: midY },
+          end,
+        ], cornerRadius);
+      }
+      const midX = (start.x + end.x) / 2;
+      return roundedRoutePath([
+        start,
+        { x: midX, y: start.y },
+        { x: midX, y: end.y },
+        end,
+      ], cornerRadius);
     }
     const curve = edge?.curve || (vertical ? 'vertical' : 'horizontal');
 
@@ -1009,19 +1045,22 @@
     return `M ${start.x} ${start.y} C ${midX} ${start.y}, ${midX} ${end.y}, ${end.x} ${end.y}`;
   }
 
-  function drawMarker(defs, markerId) {
+  function drawMarker(defs, markerId, requestedSize) {
+    const parsedSize = Number(requestedSize);
+    const markerSize = Number.isFinite(parsedSize) ? Math.max(4, Math.min(10, parsedSize)) : 8;
     const marker = createSvgElement('marker', {
       id: markerId,
       viewBox: '0 0 10 10',
       refX: '8.6',
       refY: '5',
-      markerWidth: '8',
-      markerHeight: '8',
+      markerWidth: String(markerSize),
+      markerHeight: String(markerSize),
+      markerUnits: 'userSpaceOnUse',
       orient: 'auto-start-reverse',
     });
     marker.appendChild(createSvgElement('path', {
       d: 'M 0 0 L 10 5 L 0 10 z',
-      fill: LINE_COLOR,
+      fill: 'context-stroke',
     }));
     defs.appendChild(marker);
   }
@@ -1179,22 +1218,31 @@
       group.appendChild(pager);
     }
 
-    const toggleX = cluster.x + cluster.width - EXPAND_BUTTON_EDGE_GAP - EXPAND_BUTTON_RADIUS;
-    const toggleY = cluster.y + EXPAND_BUTTON_EDGE_GAP + EXPAND_BUTTON_RADIUS;
-    group.appendChild(createSvgElement('circle', {
-      class: 'pto-model-graphviz-toggle',
-      cx: toggleX,
-      cy: toggleY,
-      r: EXPAND_BUTTON_RADIUS,
-    }));
-    const icon = createSvgElement('text', {
-      class: 'pto-model-graphviz-toggle-icon',
-      x: toggleX,
-      y: toggleY + 0.3,
-      'font-size': '12',
-    });
-    icon.textContent = '-';
-    group.appendChild(icon);
+    if (cluster.collapsible !== false) {
+      const toggleX = cluster.x + cluster.width - EXPAND_BUTTON_EDGE_GAP - EXPAND_BUTTON_RADIUS;
+      const toggleY = cluster.y + EXPAND_BUTTON_EDGE_GAP + EXPAND_BUTTON_RADIUS;
+      const toggleControl = createSvgElement('g', {
+        class: 'pto-model-graphviz-toggle-control',
+      });
+      toggleControl.appendChild(createSvgElement('circle', {
+        class: 'pto-model-graphviz-toggle-hit',
+        cx: toggleX,
+        cy: toggleY,
+        r: EXPAND_BUTTON_RADIUS + 10,
+      }));
+      toggleControl.appendChild(createSvgElement('circle', {
+        class: 'pto-model-graphviz-toggle',
+        cx: toggleX,
+        cy: toggleY,
+        r: EXPAND_BUTTON_RADIUS,
+      }));
+      const icon = createSvgElement('path', {
+        class: 'pto-model-graphviz-toggle-icon',
+        d: `M ${toggleX - 5} ${toggleY} H ${toggleX + 5}`,
+      });
+      toggleControl.appendChild(icon);
+      group.appendChild(toggleControl);
+    }
     svg.appendChild(group);
     return group;
   }
@@ -1335,9 +1383,11 @@
     });
     group.appendChild(rect);
 
+    const rightReserved = node.collapsed ? EXPAND_BUTTON_EDGE_GAP + EXPAND_BUTTON_RADIUS * 2 : 0;
+    const contentX = -rightReserved / 2;
     const label = createSvgElement('text', {
       class: 'pto-model-graphviz-node-label',
-      x: node.collapsed ? -8 : 0,
+      x: contentX,
       y: visualKind === 'tensor' || visualKind === 'op' || node.hideTypeLabel || node.glyph ? 0 : -4,
       fill: NODE_TEXT_COLOR,
     });
@@ -1347,7 +1397,7 @@
     if (visualKind !== 'tensor' && visualKind !== 'op' && !node.hideTypeLabel && !node.glyph) {
       const type = createSvgElement('text', {
         class: 'pto-model-graphviz-node-type',
-        x: node.collapsed ? -8 : 0,
+        x: contentX,
         y: 12,
         fill: NODE_TYPE_COLOR,
       });
@@ -1358,19 +1408,27 @@
     if (node.collapsed) {
       const toggleX = node.width / 2 - EXPAND_BUTTON_EDGE_GAP - EXPAND_BUTTON_RADIUS;
       const toggleY = 0;
-      group.appendChild(createSvgElement('circle', {
+      const toggleControl = createSvgElement('g', {
+        class: 'pto-model-graphviz-toggle-control',
+      });
+      toggleControl.appendChild(createSvgElement('circle', {
+        class: 'pto-model-graphviz-toggle-hit',
+        cx: toggleX,
+        cy: toggleY,
+        r: EXPAND_BUTTON_RADIUS + 10,
+      }));
+      toggleControl.appendChild(createSvgElement('circle', {
         class: 'pto-model-graphviz-toggle',
         cx: toggleX,
         cy: toggleY,
         r: EXPAND_BUTTON_RADIUS,
       }));
-      const icon = createSvgElement('text', {
+      const icon = createSvgElement('path', {
         class: 'pto-model-graphviz-toggle-icon',
-        x: toggleX,
-        y: toggleY + 0.2,
+        d: `M ${toggleX - 5} ${toggleY} H ${toggleX + 5} M ${toggleX} ${toggleY - 5} V ${toggleY + 5}`,
       });
-      icon.textContent = '+';
-      group.appendChild(icon);
+      toggleControl.appendChild(icon);
+      group.appendChild(toggleControl);
     }
 
     if (options?.reportOverlays !== false) {
@@ -1799,9 +1857,29 @@
     }
 
     nodeEntries.forEach(({ el, node }) => {
-      el.setAttribute('tabindex', '0');
-      el.setAttribute('role', 'button');
-      el.setAttribute('aria-label', node.label || node.id);
+      const itemSelectable = selectable && node.selectable !== false;
+      const toggle = el.querySelector('.pto-model-graphviz-toggle-control');
+      if (toggle && typeof opts.onToggle === 'function') {
+        toggle.setAttribute('tabindex', '0');
+        toggle.setAttribute('role', 'button');
+        toggle.setAttribute('aria-label', `Expand ${node.label || node.id}`);
+        listen(toggle, 'click', (event) => {
+          event.stopPropagation();
+          hideHover();
+          opts.onToggle({ nodeId: node.id, collapsed: true, source: 'graph' });
+        });
+        listen(toggle, 'keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          opts.onToggle({ nodeId: node.id, collapsed: true, source: 'keyboard' });
+        });
+      }
+      if (itemSelectable) {
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-label', node.label || node.id);
+      }
       if (hoverEnabled) {
         listen(el, 'pointerenter', (event) => showHover(node, event));
         listen(el, 'pointermove', (event) => {
@@ -1809,7 +1887,7 @@
         });
         listen(el, 'pointerleave', hideHover);
       }
-      if (selectable) {
+      if (itemSelectable) {
         listen(el, 'click', () => {
           if (suppressClick) {
             suppressClick = false;
@@ -1843,6 +1921,24 @@
 
     const selectableClusters = selectable && interaction.selectableClusters !== false && opts.selectableClusters !== false;
     clusterEntries.forEach(({ el, cluster, layerPager }) => {
+      const itemSelectable = selectableClusters && cluster.selectable !== false;
+      const toggle = el.querySelector('.pto-model-graphviz-toggle-control');
+      if (toggle && typeof opts.onToggle === 'function') {
+        toggle.setAttribute('tabindex', '0');
+        toggle.setAttribute('role', 'button');
+        toggle.setAttribute('aria-label', `Collapse ${cluster.label || cluster.id}`);
+        listen(toggle, 'click', (event) => {
+          event.stopPropagation();
+          hideHover();
+          opts.onToggle({ nodeId: cluster.id, collapsed: false, source: 'graph' });
+        });
+        listen(toggle, 'keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          opts.onToggle({ nodeId: cluster.id, collapsed: false, source: 'keyboard' });
+        });
+      }
       const controlRoot = layerPager || el;
       const layerDots = Array.from(controlRoot.querySelectorAll('[data-layer-index]'));
       const layerSteps = Array.from(controlRoot.querySelectorAll('[data-layer-step]'));
@@ -1924,10 +2020,12 @@
           });
         });
       }
-      el.setAttribute('tabindex', '0');
-      el.setAttribute('role', 'button');
-      el.setAttribute('aria-label', cluster.label || cluster.id);
-      if (!selectableClusters) return;
+      if (itemSelectable) {
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-label', cluster.label || cluster.id);
+      }
+      if (!itemSelectable) return;
       listen(el, 'click', () => {
         if (suppressClick) {
           suppressClick = false;
@@ -2074,7 +2172,7 @@
       viewBox: `0 0 ${width} ${height}`,
     });
     const defs = createSvgElement('defs');
-    drawMarker(defs, markerId);
+    drawMarker(defs, markerId, resolvedOptions.edgeMarkerSize);
     svg.appendChild(defs);
 
     const colorMapOptions = resolvedColormapOptions(resolvedOptions);
@@ -2100,7 +2198,7 @@
       renderedEdges.add(edgeKey);
       const el = createSvgElement('path', {
         class: 'pto-model-graphviz-edge',
-        d: edgePath(source, targetNode, edge),
+        d: edgePath(source, targetNode, edge, resolvedOptions),
         stroke: edge.color || LINE_COLOR,
         'stroke-dasharray': edge.dashed ? '8 7' : null,
         'marker-end': `url(#${markerId})`,
